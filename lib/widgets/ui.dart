@@ -40,12 +40,16 @@ class PanelCard extends StatelessWidget {
 /// 一排小格子表示"最近 N 天有没有打卡"：填了色的那天有分，空心是没跑/没拿分。
 /// 连续天数光写个数字看不出趋势，这种点阵一眼就能看出哪几天断了。
 class StreakDots extends StatelessWidget {
-  const StreakDots({super.key, required this.days, this.color = T.primary, this.cell = 12});
+  const StreakDots({super.key, required this.days, this.color, this.cell = 12});
 
   /// 从最近一天往前排（与 [days] 的顺序一致：下标 0 = 今天）
   final List<bool> days;
-  final Color color;
+
+  /// 不传就用主题色。主题色现在是个性化里可改的 getter，不能再当默认值写进构造，
+  /// 所以改成可空 + 这里兜底。
+  final Color? color;
   final double cell;
+  Color get _c => color ?? T.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +62,8 @@ class StreakDots extends StatelessWidget {
             width: cell,
             height: cell,
             decoration: BoxDecoration(
-              color: days[i] ? color : Colors.transparent,
-              border: Border.all(color: days[i] ? color : T.hairline(context)),
+              color: days[i] ? _c : Colors.transparent,
+              border: Border.all(color: days[i] ? _c : T.hairline(context)),
               borderRadius: BorderRadius.circular(cell * 0.28),
             ),
           ),
@@ -77,7 +81,7 @@ class ProgressRow extends StatelessWidget {
     this.value,
     this.dots,
     this.note,
-    this.color = T.primary,
+    this.color,
     this.dotCell = 12,
   });
 
@@ -87,8 +91,9 @@ class ProgressRow extends StatelessWidget {
   /// 方格：true = 这一格已完成/当天有分
   final List<bool>? dots;
   final String? note;
-  final Color color;
+  final Color? color;
   final double dotCell;
+  Color get _c => color ?? T.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -98,11 +103,11 @@ class ProgressRow extends StatelessWidget {
         Row(children: [
           Expanded(child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
           if (value != null)
-            Text(value!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+            Text(value!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _c)),
         ]),
         if (dots != null && dots!.isNotEmpty) ...[
           const SizedBox(height: 6),
-          StreakDots(days: dots!, color: color, cell: dotCell),
+          StreakDots(days: dots!, color: _c, cell: dotCell),
         ],
         if (note != null) ...[
           const SizedBox(height: 4),
@@ -137,13 +142,16 @@ class StatTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
-    this.tint = T.primary,
+    this.tint,
   });
 
   final IconData icon;
   final String label;
   final String value;
-  final Color tint;
+
+  /// 主题色是可改的 getter，做不了构造默认值，所以可空 + 兜底
+  final Color? tint;
+  Color get _tint => tint ?? T.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -156,10 +164,10 @@ class StatTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: tint.withValues(alpha: dark ? 0.18 : 0.12),
+                color: _tint.withValues(alpha: dark ? 0.18 : 0.12),
                 borderRadius: T.sm,
               ),
-              child: Icon(icon, size: 18, color: tint),
+              child: Icon(icon, size: 18, color: _tint),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -188,10 +196,11 @@ class StatTile extends StatelessWidget {
 }
 
 class Pill extends StatelessWidget {
-  const Pill(this.text, {super.key, this.color = T.primary, this.bg});
+  const Pill(this.text, {super.key, this.color, this.bg});
   final String text;
-  final Color color;
+  final Color? color;
   final Color? bg;
+  Color get _c => color ?? T.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -199,10 +208,10 @@ class Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bg ?? color.withValues(alpha: dark ? 0.2 : 0.1),
+        color: bg ?? _c.withValues(alpha: dark ? 0.2 : 0.1),
         borderRadius: T.pill,
       ),
-      child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+      child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _c)),
     );
   }
 }

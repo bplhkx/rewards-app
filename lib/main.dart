@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
 import 'core/settings.dart';
+import 'core/style.dart';
 import 'core/tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Settings.init();
+  await StyleStore.I.load();
   runApp(const RewardsApp());
 }
 
@@ -21,9 +23,22 @@ class _RewardsAppState extends State<RewardsApp> {
   // 改完设置（含深色开关）从根节点重建一次，主题才会跟着换
   void _restart() => setState(() {});
 
+  @override
+  void initState() {
+    super.initState();
+    // 个性化页改主题色要立刻反映到 seed color，不然按钮/滑块还是老的
+    StyleStore.I.addListener(_restart);
+  }
+
+  @override
+  void dispose() {
+    StyleStore.I.removeListener(_restart);
+    super.dispose();
+  }
+
   ThemeData _build(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final scheme = ColorScheme.fromSeed(seedColor: T.primary, brightness: brightness);
+    final scheme = ColorScheme.fromSeed(seedColor: StyleStore.I.accent, brightness: brightness);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
@@ -37,11 +52,6 @@ class _RewardsAppState extends State<RewardsApp> {
         foregroundColor: dark ? Colors.white : T.slate900,
         elevation: 0,
         scrolledUnderElevation: 0,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: dark ? T.slate800 : Colors.white,
-        indicatorColor: dark ? T.primary.withValues(alpha: 0.22) : T.primaryLight,
-        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: dark ? T.slate300 : T.slate600)),
       ),
       dividerColor: dark ? T.slate700 : T.slate200,
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/panel.dart';
 import 'core/settings.dart';
+import 'core/style.dart';
 import 'core/tokens.dart';
 import 'pages/accounts.dart';
 import 'pages/home.dart';
@@ -9,6 +10,7 @@ import 'pages/logs.dart';
 import 'pages/more.dart';
 import 'pages/setup.dart';
 import 'widgets/glass_dock.dart';
+import 'widgets/page_slide.dart';
 import 'pages/view.dart';
 
 class AppShell extends StatefulWidget {
@@ -24,6 +26,23 @@ class _AppShellState extends State<AppShell> {
 
   /// 整个 App 只有一个后端入口：面板。token 都留在面板那边。
   Panel get _panel => Panel(base: Settings.panelBase, user: Settings.panelUser, pass: Settings.panelPass);
+
+  @override
+  void initState() {
+    super.initState();
+    // 个性化页改主题色/底栏样式时这里要跟着重建，否则只有那一页会变
+    StyleStore.I.addListener(_onStyle);
+  }
+
+  void _onStyle() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    StyleStore.I.removeListener(_onStyle);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +62,7 @@ class _AppShellState extends State<AppShell> {
         widget.onChanged?.call();
       }),
     ];
+    final s = StyleStore.I.dock;
     return Scaffold(
       backgroundColor: T.canvas(context),
       appBar: AppBar(
@@ -61,7 +81,9 @@ class _AppShellState extends State<AppShell> {
         ]),
       ),
       body: Stack(children: [
-        Positioned.fill(child: IndexedStack(index: _tab, children: pages)),
+        // 切页动画与胶囊共用同一条弹簧；五页常驻，切页不会把别页的数据抖没
+        Positioned.fill(
+            child: TabSwitcher(index: _tab, mode: s.transition, speed: s.speed, children: pages)),
         // 悬浮：内容要从它下面滚过去，BackdropFilter 才糊得出东西来。
         // 用 bottomNavigationBar 的话系统会把内容顶在上面，玻璃变成一块不透明灰条。
         Positioned(left: 0, right: 0, bottom: 0, child: _dock(context)),

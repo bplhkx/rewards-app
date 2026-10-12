@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'style.dart';
+
 /// 视觉令牌，1:1 取自 Dumb-Panel-APP 的 design_tokens.dart / app_theme.dart：
-/// 主色对齐 Element Plus 的 #409EFF，灰阶用 slate，圆角只有 sm/md/lg/pill 四档。
+/// 灰阶用 slate，圆角只有 sm/md/lg/pill 四档。
 class T {
   T._();
 
-  static const Color primary = Color(0xFF409EFF);
-  static const Color primaryLight = Color(0xFFECF5FF);
-  static const Color primaryDark = Color(0xFF337ECC);
+  /// 面板蓝：个性化页没动过主题色时就是它
+  static const Color blue = Color(0xFF409EFF);
+
+  /// 主色三档全部跟着个性化页走，所以是 getter 不是 const。
+  /// 注意：因此 `const TextStyle(color: T.primary)` 会编译不过，
+  /// 用到主色的地方必须去掉 const（个性化生效的前提）。
+  static Color get primary => StyleStore.I.accent;
+  static Color get primaryLight => StyleStore.I.accentLight;
+  static Color get primaryDark => StyleStore.I.accentDark;
 
   static const Color slate50 = Color(0xFFF8FAFC);
   static const Color slate100 = Color(0xFFF1F5F9);

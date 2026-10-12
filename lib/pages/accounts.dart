@@ -313,7 +313,7 @@ class _AccountsPageState extends State<AccountsPage> {
                   ]),
                 )
               else if (pickBool(m, ['streakProtectionEnabled']))
-                const Icon(Icons.shield_outlined, size: 14, color: T.primary),
+                Icon(Icons.shield_outlined, size: 14, color: T.primary),
             ]),
             const SizedBox(height: 4),
             Row(children: [
@@ -327,7 +327,7 @@ class _AccountsPageState extends State<AccountsPage> {
             ]),
             const SizedBox(height: 10),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('$points', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: T.primary)),
+              Text('$points', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: T.primary)),
               const SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
@@ -485,7 +485,7 @@ class _AccountsPageState extends State<AccountsPage> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(color: T.primary.withValues(alpha: 0.12), borderRadius: T.sm),
-                            child: const Icon(Icons.person_outline, size: 18, color: T.primary),
+                            child: Icon(Icons.person_outline, size: 18, color: T.primary),
                           ),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -503,7 +503,7 @@ class _AccountsPageState extends State<AccountsPage> {
                           ]),
                         ),
                         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                          Text('$points', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: T.primary)),
+                          Text('$points', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: T.primary)),
                           Text('当前积分', style: TextStyle(fontSize: 10, color: T.subText(context))),
                         ]),
                         if (!_selecting)

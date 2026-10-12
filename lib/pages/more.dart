@@ -8,6 +8,7 @@ import '../core/util.dart';
 import '../widgets/glass_dock.dart';
 import '../widgets/ui.dart';
 import 'config_page.dart';
+import 'personalize.dart';
 import 'schedule.dart';
 
 class MorePage extends StatefulWidget {
@@ -133,7 +134,7 @@ class _MorePageState extends State<MorePage> {
             const SectionTitle('功能'),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.schedule_rounded, size: 20, color: T.primary),
+              leading: Icon(Icons.schedule_rounded, size: 20, color: T.primary),
               title: const Text('定时任务', style: TextStyle(fontSize: 14)),
               subtitle: const Text('面板 / bot 各自的 cron、排除账号', style: TextStyle(fontSize: 11)),
               trailing: const Icon(Icons.chevron_right, size: 20),
@@ -146,6 +147,14 @@ class _MorePageState extends State<MorePage> {
               subtitle: const Text('执行开关、等待节奏、搜索策略、appkey', style: TextStyle(fontSize: 11)),
               trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ConfigPage(panel: widget.panel))),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.palette_rounded, size: 20, color: T.primary),
+              title: const Text('个性化', style: TextStyle(fontSize: 14)),
+              subtitle: const Text('主题色、底栏材质与折射、动效', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PersonalizePage())),
             ),
             const SizedBox(height: 8),
           ]),
@@ -221,7 +230,12 @@ class _MorePageState extends State<MorePage> {
             title: const Text('深色模式', style: TextStyle(fontSize: 14)),
             value: Settings.dark,
             activeColor: T.primary,
-            onChanged: (v) => setState(() => Settings.dark = v),
+            // 只 setState 的话开关会变蓝、页面还是亮的：MaterialApp 在本页之上，
+            // themeMode 要等根节点重建才会重读 Settings.dark。
+            onChanged: (v) {
+              setState(() => Settings.dark = v);
+              widget.onChanged?.call();
+            },
           ),
         ),
         const SizedBox(height: T.gap),
