@@ -361,7 +361,9 @@ class AccountDetailPage extends StatelessWidget {
         const SizedBox(height: 2),
         ProgressRow(
           label: '印章收集',
-          value: punch.isEmpty ? null : '${pickInt(punch, ['days'])}/${pickInt(punch, ['daysMax'])} 组',
+          // 单位不写死：面板给的可能是"3/12 个印章"，也可能是退回的"几张卡完成几张"，
+          // 数字本身配格子就够了，标错单位比不标更糟
+          value: punch.isEmpty ? null : '${pickInt(punch, ['days'])}/${pickInt(punch, ['daysMax'])}',
           dots: punch.isEmpty ? const [] : _cells(pickInt(punch, ['days']), pickInt(punch, ['daysMax'])),
           dotCell: 16,
           note: _kindNote(punch),
