@@ -133,7 +133,7 @@ class _MorePageState extends State<MorePage> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.schedule_rounded, size: 20, color: T.primary),
-              title: const Text('定时跑', style: TextStyle(fontSize: 14)),
+              title: const Text('定时任务', style: TextStyle(fontSize: 14)),
               subtitle: const Text('面板 / bot 各自的 cron、排除账号', style: TextStyle(fontSize: 11)),
               trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SchedulePage(panel: widget.panel))),

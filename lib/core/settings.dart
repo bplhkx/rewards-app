@@ -27,15 +27,16 @@ class Settings {
   static bool get dark => _p?.getBool('dark') ?? false;
   static set dark(bool v) => _p?.setBool('dark', v);
 
-  /// 账号页的展示形态：0=详细·柱状图，1=详细·热力图，2=双列紧凑（一屏看四个）
-  /// 旧版本存的是布尔 chartHeatmap，这里顺带迁移一次。
+  /// 账号页的展示形态：0=详细·柱状图，1=双列紧凑（一屏看四个）。
+  /// 热力图那一档已经去掉。旧版本号含义不同（1=热力图、2=紧凑），所以另起
+  /// viewMode2 这个键，只在首次读时把旧值迁移一次，避免升级后排版莫名变掉。
   static int get viewMode {
-    final stored = _p?.getInt('viewMode');
-    if (stored != null) return stored.clamp(0, 2);
-    return (_p?.getBool('chartHeatmap') ?? false) ? 1 : 0;
+    final now = _p?.getInt('viewMode2');
+    if (now != null) return now == 1 ? 1 : 0;
+    return (_p?.getInt('viewMode')) == 2 ? 1 : 0;
   }
 
-  static set viewMode(int v) => _p?.setInt('viewMode', v.clamp(0, 2));
+  static set viewMode(int v) => _p?.setInt('viewMode2', v == 1 ? 1 : 0);
 
   static String _s(String k) => _p?.getString(k)?.trim() ?? '';
 

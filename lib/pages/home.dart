@@ -121,6 +121,15 @@ class _HomePageState extends State<HomePage> {
 
   int get _accountCount => (_accounts['accounts'] as List?)?.length ?? 0;
 
+  /// 主页要说清楚"现在在跑谁"。空闲时 bot 的 /status 依然缓存上一轮的
+  /// currentAccount，那是"最后跑到谁"，不能写成正在跑，所以两种状态分开措辞。
+  String get _currentText {
+    final who = pickStr(_live, ['currentAccount']);
+    final gained = pickInt(_live, ['gained']);
+    if (who.isEmpty) return _running ? '正在启动，还没进入账号…' : '还没有运行记录';
+    return '${_running ? "当前" : "最后跑到"} $who ｜ 本轮 +$gained';
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -164,7 +173,9 @@ class _HomePageState extends State<HomePage> {
                     leading: Icon(ok ? Icons.check_circle_outline : Icons.error_outline,
                         size: 18, color: ok ? T.green500 : T.red500),
                     title: Text(
-                      '${pickStr(m, ['start_ts', 'startTs', 'id']).replaceFirst('T', ' ').substring(0, 16)}',
+                      // 必须走 dateTimeText：startTs 是真 UTC（还带 12 位小数秒），
+                      // 以前直接 substring(0,16) 截字符串，等于把 19:30 的跑显示成 11:30。
+                      dateTimeText(pickStr(m, ['start_ts', 'startTs', 'id'])),
                       style: const TextStyle(fontSize: 13),
                     ),
                     trailing: Pill(ok ? '+${pickInt(m, ['total_gained', 'totalGained'])}' : pickStr(m, ['status']),
@@ -181,7 +192,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _statusCard(BuildContext context) {
-    final live = _live;
     return PanelCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,13 +216,25 @@ class _HomePageState extends State<HomePage> {
                 style: TextStyle(fontSize: 12, color: T.subText(context))),
             const SizedBox(height: 10),
           ],
-          if (_running) ...[
-            Text(
-              '当前 ${pickStr(live, ['currentAccount'], '…')} ｜ 本轮 +${pickInt(live, ['gained'])}',
-              style: TextStyle(fontSize: 12, color: T.subText(context)),
+          // 常驻一行：正在跑谁 / 空闲时最后跑到谁
+          Row(children: [
+            Icon(_running ? Icons.play_circle_outline : Icons.account_circle_outlined,
+                size: 15, color: _running ? T.green500 : T.slate400),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(_currentText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: _running ? FontWeight.w700 : FontWeight.w400,
+                      color: _running ? T.green500 : T.subText(context))),
             ),
-            const SizedBox(height: 10),
-          ],
+            if (_running && pickInt(_run, ['accountsTotal']) > 0)
+              Text('账号 ${pickInt(_run, ['accountsSeen'])}/${pickInt(_run, ['accountsTotal'])}',
+                  style: TextStyle(fontSize: 11, color: T.subText(context))),
+          ]),
+          const SizedBox(height: 10),
           Row(children: [
             Expanded(
               child: FilledButton.icon(

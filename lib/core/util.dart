@@ -117,6 +117,29 @@ String stampText(String raw, {bool withDate = true}) {
   return withDate ? '${l.month}/${l.day} $hm' : hm;
 }
 
+/// 日期 + 时分，用于"最近运行"这种要跨天的列表。
+/// 面板的 runs.startTs 是**真 UTC**（还是带 12 位小数秒的那种怪串，Dart 能解析），
+/// 直接截字符串等于把 19:30 的跑显示成 11:30 —— 之前主页就这样早了 8 小时。
+String dateTimeText(String raw) {
+  final dt = parseBotTs(raw);
+  if (dt == null) return raw.isEmpty ? '--' : raw;
+  final l = dt.toLocal();
+  return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}';
+}
+
+/// 打卡类活动的 kind（面板 checkin_progress 的键）→ 中文。
+const Map<String, String> checkinKindLabels = {
+  'default-search': '默认搜索引擎',
+};
+
+String checkinStatusLabel(String status) => switch (status) {
+      'advanced' => '今日已推进',
+      'complete' => '已全部完成',
+      'stalled' => '今日未计入',
+      'started' => '打卡中',
+      _ => '进度',
+    };
+
 /// bot 的分类积分键（scripts/api/logParser.js 的 pointEventSource）→ 中文。
 const Map<String, String> pointSourceLabels = {
   'search': '搜索',

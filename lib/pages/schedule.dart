@@ -5,7 +5,7 @@ import '../core/tokens.dart';
 import '../core/util.dart';
 import '../widgets/ui.dart';
 
-/// 定时跑。这里有两套彼此独立的定时：
+/// 定时任务。这里有两套彼此独立的定时：
 /// · 面板自己的 scheduler（到点由面板调 /api/control/start，记 nextRunAt/上次结果）
 /// · bot 容器里的 cron（写 Control API 的 /schedule，由 bot 侧 OS cron 触发）
 /// 顶部切换，读写都走面板的 /api/schedule（PUT 带 target），App 不碰 bot 的 token。
@@ -159,7 +159,7 @@ class _SchedulePageState extends State<SchedulePage> {
     final cronErr = pickStr(cur, ['error']);
     return Scaffold(
       backgroundColor: T.canvas(context),
-      appBar: AppBar(title: const Text('定时跑'), backgroundColor: T.canvas(context)),
+      appBar: AppBar(title: const Text('定时任务'), backgroundColor: T.canvas(context)),
       body: ListView(
         padding: const EdgeInsets.all(T.pagePad),
         children: [

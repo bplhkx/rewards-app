@@ -4,14 +4,19 @@ import '../core/tokens.dart';
 
 /// 扁平卡片：参考实现里 96% 的"卡片"不走 Material Card，就是圆角容器 + 描边。
 class PanelCard extends StatelessWidget {
-  const PanelCard({super.key, required this.child, this.padding, this.onTap});
+  const PanelCard({super.key, required this.child, this.padding, this.onTap, this.accent});
 
   final Widget child;
   final EdgeInsets? padding;
   final VoidCallback? onTap;
 
+  /// accent 非空 = 这条正是 bot 当前在跑的账号：边框换成主色并铺一点底色。
+  /// 只靠一个小 pill 的话，手机上一屏四个账号扫过去根本分不出来。
+  final Color? accent;
+
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: T.surface(context),
       borderRadius: T.lg,
@@ -21,7 +26,8 @@ class PanelCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: T.lg,
-            border: Border.all(color: T.hairline(context)),
+            color: accent?.withValues(alpha: dark ? 0.14 : 0.06),
+            border: Border.all(color: accent ?? T.hairline(context), width: accent == null ? 1 : 1.6),
           ),
           padding: padding ?? const EdgeInsets.all(T.gap),
           child: child,

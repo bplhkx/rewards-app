@@ -16,6 +16,8 @@ class AccountDetailPage extends StatelessWidget {
     required this.history,
     this.daily = const [],
     this.today = '',
+    this.checkins = const {},
+    this.running = false,
   });
 
   /// /api/accounts 里这条账号的合并数据
@@ -32,6 +34,13 @@ class AccountDetailPage extends StatelessWidget {
 
   /// 面板给的"今天"（北京日期 YYYY-MM-DD）
   final String today;
+
+  /// 面板 /api/accounts 的 checkins[email]：
+  /// {today, tasks:{source:{streak,todayDone}}, checkins:{'default-search':{days,daysMax,status,ts}}}
+  final Map<String, dynamic> checkins;
+
+  /// bot 当前正在跑的就是这个账号
+  final bool running;
 
   Map<String, dynamic> get _ls => live['live'] is Map ? (live['live'] as Map).cast<String, dynamic>() : const {};
 
@@ -62,7 +71,19 @@ class AccountDetailPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: T.canvas(context),
-      appBar: AppBar(title: Text(email, style: const TextStyle(fontSize: 15)), backgroundColor: T.canvas(context)),
+      appBar: AppBar(
+        title: Row(children: [
+          Flexible(
+            child: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15)),
+          ),
+          if (running) ...[
+            const SizedBox(width: 8),
+            const Pill('当前在跑', color: T.green500),
+          ],
+        ]),
+        backgroundColor: T.canvas(context),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(T.pagePad),
         children: [
@@ -85,6 +106,9 @@ class AccountDetailPage extends StatelessWidget {
                 ..._bars(dayRows),
             ]),
           ),
+          const SizedBox(height: T.gap),
+          // ---------- 打卡情况（面板 checkinSummary：连续天数 + 跨天活动进度） ----------
+          _checkinCard(context),
           const SizedBox(height: T.gap),
           // ---------- 本轮（bot 内存） ----------
           PanelCard(
@@ -240,6 +264,99 @@ class AccountDetailPage extends StatelessWidget {
       return '已开启 · 连胜 ${pickInt(account, ['streakCounter'])} 天 · 剩余 ${pickInt(account, ['streakProtectionRemainingDays'])} 天缓冲';
     }
     return '未开启';
+  }
+
+  /// 打卡情况：跨天连续型活动（默认搜索引擎 x/14 天）+ 各分类的连续得分天数。
+  /// 连续天数由面板从 daily_points 倒推，今天还没跑不算断，只标"今日未打卡"。
+  Widget _checkinCard(BuildContext context) {
+    final dse = (checkins['checkins'] as Map?)?['default-search'];
+    final tasks = (checkins['tasks'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    // 已知分类按 labels 的顺序排，bot 将来加了新键也照样显示（原样透出键名）
+    final order = <String>[
+      for (final k in pointSourceLabels.keys)
+        if (tasks.containsKey(k)) k,
+      for (final k in tasks.keys)
+        if (!pointSourceLabels.containsKey(k)) k,
+    ];
+
+    return PanelCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const SectionTitle('打卡情况'),
+          const Spacer(),
+          Text('连续天数 · 近 90 天', style: TextStyle(fontSize: 10.5, color: T.subText(context))),
+        ]),
+        const SizedBox(height: 10),
+        if (dse is Map)
+          _dseRow(context, dse.cast<String, dynamic>())
+        else
+          Text('默认搜索引擎：还没有打卡进度记录（bot 每天跑的时候才会读进度）',
+              style: TextStyle(fontSize: 11.5, height: 1.5, color: T.subText(context))),
+        const SizedBox(height: 12),
+        Divider(color: T.hairline(context), height: 1),
+        const SizedBox(height: 8),
+        if (order.isEmpty)
+          Text('还没有分类打卡记录 —— 面板从今天起才把每日分类积分固化下来',
+              style: TextStyle(fontSize: 11.5, height: 1.5, color: T.subText(context)))
+        else
+          for (final k in order) _taskRow(context, k, tasks[k] as Map?),
+      ]),
+    );
+  }
+
+  Widget _dseRow(BuildContext context, Map<String, dynamic> d) {
+    final days = pickInt(d, ['days']);
+    final max = pickInt(d, ['daysMax'], 14);
+    final ratio = max <= 0 ? 0.0 : (days / max).clamp(0.0, 1.0);
+    final done = days >= max && max > 0;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const Text('默认搜索引擎', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const Spacer(),
+        Text('$days/$max 天',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: done ? T.green500 : T.primary)),
+      ]),
+      const SizedBox(height: 6),
+      // 14 天要一格一格数，画成进度条比看数字直观
+      Container(
+        height: 7,
+        decoration: BoxDecoration(color: T.slate500.withValues(alpha: 0.18), borderRadius: T.sm),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FractionallySizedBox(
+            widthFactor: ratio,
+            child: Container(decoration: BoxDecoration(color: done ? T.green500 : T.primary, borderRadius: T.sm)),
+          ),
+        ),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        '${checkinStatusLabel(pickStr(d, ['status']))}${pickStr(d, ['ts']).isEmpty ? '' : ' · ${stampText(pickStr(d, ['ts']))} 记录'}',
+        style: TextStyle(fontSize: 10.5, color: T.subText(context)),
+      ),
+    ]);
+  }
+
+  Widget _taskRow(BuildContext context, String key, Map? raw) {
+    final m = raw?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    final streak = pickInt(m, ['streak']);
+    final todayDone = pickBool(m, ['todayDone']);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        SizedBox(width: 96, child: Text(pointSourceLabels[key] ?? key, style: const TextStyle(fontSize: 12.5))),
+        Icon(todayDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+            size: 15, color: todayDone ? T.green500 : T.slate400),
+        const SizedBox(width: 5),
+        Text(todayDone ? '今日已打卡' : '今日未打卡',
+            style: TextStyle(fontSize: 11.5, color: todayDone ? T.green500 : T.subText(context))),
+        const Spacer(),
+        Text('连续 $streak 天', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+      ]),
+    );
   }
 
   List<Widget> _bars(List<({String key, String label, int value})> rows) {

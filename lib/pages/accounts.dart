@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/panel.dart';
@@ -25,17 +27,29 @@ class _AccountsPageState extends State<AccountsPage> {
   Map<String, dynamic>? _sched;
   /// 本轮 live 数据，按邮箱索引（分类积分只在这里）
   Map<String, Map<String, dynamic>> _live = {};
+  /// bot 正在跑哪个账号（run.live.currentAccount）+ 有没有在跑，卡片要标出来
+  String _currentEmail = '';
+  bool _running = false;
   String? _err;
   bool _selecting = false;
-  /// 展示形态：0=详细·柱状图 1=详细·热力图 2=双列紧凑。头部那个按钮循环切换，选择记在设置里
+  /// 展示形态：0=详细·柱状图 1=双列紧凑（热力图那档已去掉，紧凑卡片里带当月热力图）
   int _mode = Settings.viewMode;
   final Set<int> _picked = {};
   bool _busy = false;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // bot 19:30 那种定时跑起来时，没人点刷新也得看见"当前在跑谁"
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -50,12 +64,18 @@ class _AccountsPageState extends State<AccountsPage> {
       } catch (_) {
         s = null; // 读不到定时不影响账号列表
       }
-      // 本轮的分类积分（live.bySource）只在 /api/summary 的 status.bot.run.accounts 里
+      // 本轮的分类积分（live.bySource）与当前账号都只在 /api/summary 的 status.bot.run 里
       final live = <String, Map<String, dynamic>>{};
+      var running = false;
+      var currentEmail = '';
       try {
         final sum = await widget.panel.get('/api/summary');
-        final run = (((sum is Map ? sum['status'] : null) as Map?)?['bot'] as Map?)?['run'];
-        for (final a in ((run is Map ? run['accounts'] : null) as List? ?? const [])) {
+        final st = (sum is Map ? sum['status'] : null) as Map?;
+        running = st?['botRunning'] == true;
+        final bot = st?['bot'] as Map?;
+        final run = bot?['run'] as Map?;
+        currentEmail = pickStr((run?['live'] as Map?)?.cast<String, dynamic>(), ['currentAccount']);
+        for (final a in (run?['accounts'] as List? ?? const [])) {
           if (a is Map) {
             final email = pickStr(a, ['email']);
             if (email.isNotEmpty) live[email] = a.cast<String, dynamic>();
@@ -69,6 +89,8 @@ class _AccountsPageState extends State<AccountsPage> {
         _data = d is Map<String, dynamic> ? d : null;
         _sched = s;
         _live = live;
+        _running = running;
+        _currentEmail = currentEmail;
         _err = null;
       });
     } catch (e) {
@@ -85,6 +107,49 @@ class _AccountsPageState extends State<AccountsPage> {
   List<dynamic> _dailyFor(String email) =>
       ((_data?['dailyPoints'] as Map?)?[email] as List?) ?? const [];
   String get _today => pickStr(_data, ['today']);
+
+  /// 面板固化的"今天"分类合计；今天还没跑就退回上一轮的 gained ——
+  /// 否则凌晨到下一次跑之间，卡片会显示"今日 +0"，看着像没干活。
+  int _todayFor(String email, {required int fallback}) {
+    for (final d in _dailyFor(email)) {
+      if (d is Map && pickStr(d, ['day']) == _today) return pickInt(d.cast<String, dynamic>(), ['total'], fallback);
+    }
+    return fallback;
+  }
+
+  /// 面板 checkinSummary()[email]：{today, tasks:{source:{streak,todayDone}}, checkins:{kind:{days,daysMax,status,ts}}}
+  Map<String, dynamic> _checkinsFor(String email) {
+    final all = _data?['checkins'];
+    if (all is! Map) return const {};
+    final m = all[email];
+    return m is Map ? m.cast<String, dynamic>() : const {};
+  }
+
+  /// 只有 bot 真在跑、且这条就是 currentAccount 时才标 —— 空闲时缓存的 currentAccount
+  /// 会一直留着上一轮最后一个账号，标出来就是骗人。
+  bool _isCurrent(String email) => _running && email.isNotEmpty && email == _currentEmail;
+
+  /// 默认搜索引擎 x/14：账号卡片与详情共用，紧凑模式也要看得见
+  String? _dseText(Map<String, dynamic> checkins) {
+    final d = (checkins['checkins'] as Map?)?['default-search'];
+    if (d is! Map) return null;
+    final m = d.cast<String, dynamic>();
+    return '默认搜索 ${pickInt(m, ['days'])}/${pickInt(m, ['daysMax'])}';
+  }
+
+  /// 详细与紧凑两种排版共用的 pill 组。紧凑卡片一屏四个、竖向空间就那么点，
+  /// 所以只留"今日 + 连胜"两颗；连胜保护靠右上角的盾牌图标，默认搜索进详情页看。
+  List<Widget> _pills(Map<String, dynamic> m, Map<String, dynamic> checkins, int today, {bool compact = false}) {
+    final streak = pickInt(m, ['streakCounter', 'successStreak']);
+    final shieldDays = pickInt(m, ['streakProtectionRemainingDays']);
+    final dse = _dseText(checkins);
+    return [
+      Pill('今日 +$today', color: today > 0 ? T.green500 : T.slate500),
+      Pill('连胜 $streak 天', color: T.amber500),
+      if (!compact && pickBool(m, ['streakProtectionEnabled'])) Pill('连胜保护-$shieldDays天', color: T.primary),
+      if (!compact && dse != null) Pill(dse, color: T.purple500),
+    ];
+  }
 
   /// 面板自己的定时和 bot 的定时哪个真的会触发，就显示哪个的时间；都没开就明说，别留白。
   ({String when, String who})? get _nextRun {
@@ -189,8 +254,12 @@ class _AccountsPageState extends State<AccountsPage> {
         final last = hist.isNotEmpty ? hist.last as Map<String, dynamic> : null;
         final points = pickInt(last, ['points']);
         final gained = pickInt(last, ['gained']);
+        final today = _todayFor(email, fallback: gained);
+        final checkins = _checkinsFor(email);
+        final current = _isCurrent(email);
         final checked = _picked.contains(idx);
         return PanelCard(
+          accent: current ? T.primary : null,
           padding: const EdgeInsets.all(12),
           onTap: _selecting
               ? () => setState(() => checked ? _picked.remove(idx) : _picked.add(idx))
@@ -201,6 +270,8 @@ class _AccountsPageState extends State<AccountsPage> {
                       history: hist,
                       daily: _dailyFor(email),
                       today: _today,
+                      checkins: checkins,
+                      running: current,
                     ),
                   )),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -217,7 +288,17 @@ class _AccountsPageState extends State<AccountsPage> {
               else
                 Text('#$idx', style: TextStyle(fontSize: 11, color: T.subText(context))),
               const Spacer(),
-              if (pickBool(m, ['streakProtectionEnabled']))
+              if (current)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: T.green500, borderRadius: T.pill),
+                  child: const Row(children: [
+                    SizedBox(width: 4, height: 4, child: DecoratedBox(decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle))),
+                    SizedBox(width: 3),
+                    Text('在跑', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700)),
+                  ]),
+                )
+              else if (pickBool(m, ['streakProtectionEnabled']))
                 const Icon(Icons.shield_outlined, size: 14, color: T.primary),
             ]),
             const SizedBox(height: 4),
@@ -239,10 +320,7 @@ class _AccountsPageState extends State<AccountsPage> {
                 child: Text('分', style: TextStyle(fontSize: 10, color: T.subText(context))),
               ),
             ]),
-            Wrap(spacing: 5, runSpacing: 5, children: [
-              Pill('本次 +$gained', color: gained > 0 ? T.green500 : T.slate500),
-              Pill('连胜 ${pickInt(m, ['streakCounter', 'successStreak'])}', color: T.amber500),
-            ]),
+            Wrap(spacing: 5, runSpacing: 5, children: _pills(m, checkins, today, compact: true)),
             const Spacer(),
             // 当月热力图：紧凑模式也要能一眼看出这个月哪天跑了、哪天断了
             MonthHeatmap(
@@ -273,12 +351,21 @@ class _AccountsPageState extends State<AccountsPage> {
               const Spacer(),
               if (_selecting)
                 TextButton(onPressed: () => setState(() { _picked.addAll(_allIndexes); }), child: const Text('全选', style: TextStyle(fontSize: 12))),
-              // 三种形态各一个按钮，点谁就是谁 —— 循环切换要点两次才能回到想要的那个
+              // 只留两种形态：详细柱状图 + 双列紧凑（热力图档已去掉，紧凑卡片里有当月热力图）
               _modeButton(0, Icons.bar_chart_rounded, '柱状图'),
-              _modeButton(1, Icons.grid_on_rounded, '热力图'),
-              _modeButton(2, Icons.view_agenda_outlined, '双列紧凑'),
+              _modeButton(1, Icons.view_agenda_outlined, '双列紧凑'),
               IconButton(onPressed: _load, icon: const Icon(Icons.refresh, size: 20)),
             ]),
+            if (_running && _currentEmail.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(children: [
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: T.green500, borderRadius: T.pill)),
+                  const SizedBox(width: 5),
+                  Text('当前在跑 ${_currentEmail}',
+                      style: const TextStyle(fontSize: 11.5, color: T.green500, fontWeight: FontWeight.w700)),
+                ]),
+              ),
             if (next != null)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
@@ -321,7 +408,7 @@ class _AccountsPageState extends State<AccountsPage> {
           ]),
         ),
         Expanded(
-          child: _mode == 2
+          child: _mode == 1
               ? _compactGrid(context, accounts, histories)
               : ListView(
             padding: const EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, 90),
@@ -335,18 +422,14 @@ class _AccountsPageState extends State<AccountsPage> {
                 final last = hist.isNotEmpty ? hist.last as Map<String, dynamic> : null;
                 final points = pickInt(last, ['points']);
                 final gained = pickInt(last, ['gained']);
-                final streak = pickInt(m, ['streakCounter', 'successStreak']);
+                final today = _todayFor(email, fallback: gained);
+                final checkins = _checkinsFor(email);
+                final current = _isCurrent(email);
                 final byDay = <String, int>{};
-                final byDayKey = <String, int>{};
                 for (final h in hist) {
                   if (h is Map<String, dynamic>) {
                     final k = dayLabel(pickStr(h, ['ts']));
                     byDay[k] = (byDay[k] ?? 0) + pickInt(h, ['gained']);
-                    final dt = DateTime.tryParse(pickStr(h, ['ts']))?.toLocal();
-                    if (dt != null) {
-                      final dk = dayKey(dt);
-                      byDayKey[dk] = (byDayKey[dk] ?? 0) + pickInt(h, ['gained']);
-                    }
                   }
                 }
                 // histories 是按时间升序进来的，所以插入顺序就是时间顺序；
@@ -358,6 +441,7 @@ class _AccountsPageState extends State<AccountsPage> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: T.gap),
                   child: PanelCard(
+                    accent: current ? T.primary : null,
                     onTap: _selecting
                         ? () => setState(() => checked ? _picked.remove(idx) : _picked.add(idx))
                         : () => Navigator.of(context).push(MaterialPageRoute(
@@ -367,6 +451,8 @@ class _AccountsPageState extends State<AccountsPage> {
                                 history: (histories[email] as List?) ?? const [],
                                 daily: _dailyFor(email),
                                 today: _today,
+                                checkins: checkins,
+                                running: current,
                               ),
                             )),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -388,7 +474,14 @@ class _AccountsPageState extends State<AccountsPage> {
                           ),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(email, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            Row(children: [
+                              Flexible(child: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                              if (current) ...[
+                                const SizedBox(width: 6),
+                                const Pill('当前在跑', color: T.green500),
+                              ],
+                            ]),
                             const SizedBox(height: 2),
                             Text('#$idx · ${pickStr(m, ['geoLocale']).split(RegExp(r'[ |]')).first} · ${pickStr(m, ['langCode'], 'zh-CN')}',
                                 style: TextStyle(fontSize: 11, color: T.subText(context))),
@@ -412,20 +505,8 @@ class _AccountsPageState extends State<AccountsPage> {
                           ),
                       ]),
                       const SizedBox(height: 10),
-                      Wrap(spacing: 6, runSpacing: 6, children: [
-                        Pill('本次 +$gained', color: gained > 0 ? T.green500 : T.slate500),
-                        Pill('连胜 $streak', color: T.amber500),
-                        Pill('记录 ${hist.length} 次', color: T.purple500),
-                        if (pickBool(m, ['streakProtectionEnabled']))
-                          const Pill('🛡 保连胜', color: T.primary),
-                      ]),
-                      if (_mode == 1) ...[
-                        const SizedBox(height: 12),
-                        DailyHeatmap(
-                          byDay: byDayKey,
-                          onTapDay: (k, g) => _toast('$k · ${g > 0 ? "+$g 分" : "没跑"}'),
-                        ),
-                      ] else if (daily.isNotEmpty) ...[
+                      Wrap(spacing: 6, runSpacing: 6, children: _pills(m, checkins, today)),
+                      if (daily.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         SizedBox(height: 74, child: TrendChart(days: daily)),
                       ],
