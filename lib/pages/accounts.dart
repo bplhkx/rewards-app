@@ -7,6 +7,7 @@ import '../core/tokens.dart';
 import '../core/util.dart';
 import '../core/settings.dart';
 import '../widgets/daily_heatmap.dart';
+import '../widgets/glass_dock.dart';
 import '../widgets/trend_chart.dart';
 import '../widgets/ui.dart';
 import 'account_detail.dart';
@@ -111,19 +112,22 @@ class _AccountsPageState extends State<AccountsPage> {
   /// 今日合计：以面板 account_history 的**每轮记录**为准 —— 主页的"今日"也是从机器人
   /// 自己的每轮结果算出来的，两边同源才不会一个说 +2094、一个说 +1993。
   /// daily_points 只负责分类明细：它以前按天存 MAX，一天跑两轮会把第二轮吞掉
-  /// （10-12 实测就少了 101 分），现在改成按轮记账，但历史那几天的明细仍可能偏少。
+  /// （10-12 实测就少了 101 分），现在改成按轮记账。
+  ///
+  /// 注意 fallback 只在"这个账号一条历史都没有"时生效（面板刚装好、还没跑过）。
+  /// 今天没跑就是 0 —— 以前无条件退回"上一轮的 gained"，结果凌晨看卡片是
+  /// "今日 +30"、主页是"今日 +0"，两边又对不上了。
   int _todayFor(String email, {required int fallback}) {
     final hist = ((_data?['histories'] as Map?)?[email] as List?) ?? const [];
+    if (hist.isEmpty) return fallback;
     var sum = 0;
-    var hit = false;
     for (final h in hist) {
       if (h is! Map) continue;
       final dt = DateTime.tryParse(pickStr(h, ['ts']))?.toLocal();
       if (dt == null || dayKey(dt) != _today) continue;
       sum += pickInt(h, ['gained']);
-      hit = true;
     }
-    return hit ? sum : fallback;
+    return sum;
   }
 
   /// 面板 checkinSummary()[email]：{today, tasks:{source:{streak,todayDone}}, checkins:{kind:{days,daysMax,status,ts}}}
@@ -247,7 +251,7 @@ class _AccountsPageState extends State<AccountsPage> {
   Widget _compactGrid(BuildContext context, List<Map<String, dynamic>> accounts, Map histories) {
     if (accounts.isEmpty) return const LoadingBox(height: 200);
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, 90),
+      padding: EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, GlassDock.reserve(context) + T.gap),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: T.gap,
@@ -421,7 +425,7 @@ class _AccountsPageState extends State<AccountsPage> {
           child: _mode == 1
               ? _compactGrid(context, accounts, histories)
               : ListView(
-            padding: const EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, 90),
+            padding: EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, GlassDock.reserve(context) + T.gap),
             children: [
               if (_err != null) ...[ErrorBanner(_err!, onRetry: _load), const SizedBox(height: T.gap)],
               if (accounts.isEmpty && _err == null) const LoadingBox(height: 200),
@@ -532,7 +536,9 @@ class _AccountsPageState extends State<AccountsPage> {
       bottomNavigationBar: _selecting
           ? SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, T.pagePad),
+                // 悬浮 dock 盖在页面之上，所以这条"跑这 N 个"要停在 dock 上面，
+                // 否则会被玻璃条压住看不见
+                padding: EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, GlassDock.reserve(context)),
                 child: Row(children: [
                   Expanded(
                     child: FilledButton.icon(

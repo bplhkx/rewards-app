@@ -5,6 +5,7 @@ import '../core/panel.dart';
 import '../core/settings.dart';
 import '../core/tokens.dart';
 import '../core/util.dart';
+import '../widgets/glass_dock.dart';
 import '../widgets/ui.dart';
 import 'config_page.dart';
 import 'schedule.dart';
@@ -123,7 +124,7 @@ class _MorePageState extends State<MorePage> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(T.pagePad),
+      padding: EdgeInsets.fromLTRB(T.pagePad, T.pagePad, T.pagePad, GlassDock.reserve(context) + T.gap),
       children: [
         PanelCard(
           padding: const EdgeInsets.symmetric(horizontal: T.gap, vertical: 4),

@@ -8,6 +8,7 @@ import 'pages/home.dart';
 import 'pages/logs.dart';
 import 'pages/more.dart';
 import 'pages/setup.dart';
+import 'widgets/glass_dock.dart';
 import 'pages/view.dart';
 
 class AppShell extends StatefulWidget {
@@ -59,22 +60,26 @@ class _AppShellState extends State<AppShell> {
           const Text('Rewards', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
         ]),
       ),
-      body: IndexedStack(index: _tab, children: pages),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: T.surface(context),
-        indicatorColor: T.primaryLight,
-        selectedIndex: _tab,
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard_rounded), label: '主页'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people_rounded), label: '账号'),
-          NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal_rounded), label: '日志'),
-          NavigationDestination(icon: Icon(Icons.visibility_outlined), selectedIcon: Icon(Icons.visibility_rounded), label: '视图'),
-          NavigationDestination(icon: Icon(Icons.menu_outlined), selectedIcon: Icon(Icons.menu_rounded), label: '更多'),
-        ],
-      ),
+      body: Stack(children: [
+        Positioned.fill(child: IndexedStack(index: _tab, children: pages)),
+        // 悬浮：内容要从它下面滚过去，BackdropFilter 才糊得出东西来。
+        // 用 bottomNavigationBar 的话系统会把内容顶在上面，玻璃变成一块不透明灰条。
+        Positioned(left: 0, right: 0, bottom: 0, child: _dock(context)),
+      ]),
+    );
+  }
+
+  Widget _dock(BuildContext context) {
+    return GlassDock(
+      index: _tab,
+      onSelect: (i) => setState(() => _tab = i),
+      items: const [
+        DockItem(icon: Icons.space_dashboard_outlined, activeIcon: Icons.space_dashboard_rounded, label: '主页'),
+        DockItem(icon: Icons.people_outline, activeIcon: Icons.people_rounded, label: '账号'),
+        DockItem(icon: Icons.terminal_outlined, activeIcon: Icons.terminal_rounded, label: '日志'),
+        DockItem(icon: Icons.visibility_outlined, activeIcon: Icons.visibility_rounded, label: '视图'),
+        DockItem(icon: Icons.menu_outlined, activeIcon: Icons.menu_rounded, label: '更多'),
+      ],
     );
   }
 }

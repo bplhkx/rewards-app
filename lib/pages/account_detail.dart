@@ -289,6 +289,50 @@ class AccountDetailPage extends StatelessWidget {
     return v is Map ? v.cast<String, dynamic>() : const <String, dynamic>{};
   }
 
+  /// 按关键字找 kind。streak 的 kind 名带的是页面上的 partner（slug 化之后仍不可控，
+  /// 可能是 "bing"、"search"、"cn.bing"…），所以只能按关键字认，不能写死全名。
+  Map<String, dynamic> _kindLike(List<String> keywords) {
+    final all = (checkins['checkins'] as Map?) ?? const {};
+    for (final entry in all.entries) {
+      final key = entry.key.toLowerCase();
+      if (!keywords.any(key.contains)) continue;
+      final v = entry.value;
+      if (v is Map) return v.cast<String, dynamic>();
+    }
+    return const <String, dynamic>{};
+  }
+
+  /// 有真进度就用真进度（格子），没有就退回 daily_points 的"连续得分天数"近似值。
+  /// 退回时必须说清是推算的，否则看着像微软给的 n/m。
+  Widget _streakRow(
+    String label,
+    List<String> keywords, {
+    required List<bool> fallbackDots,
+    required int fallbackStreak,
+    Color color = T.primary,
+  }) {
+    final real = _kindLike(keywords);
+    if (real.isNotEmpty) {
+      final days = pickInt(real, ['days']);
+      final max = pickInt(real, ['daysMax'], 1);
+      return ProgressRow(
+        label: label,
+        value: '$days/$max 天',
+        dots: _cells(days, max),
+        dotCell: max > 16 ? 11 : 15,
+        note: _kindNote(real),
+        color: color,
+      );
+    }
+    return ProgressRow(
+      label: label,
+      value: '连续 $fallbackStreak 天',
+      dots: fallbackDots,
+      note: '还没拿到页面上的连续天数 · 按"当天拿到过积分"推算',
+      color: color,
+    );
+  }
+
   /// 右下角那句小字：什么时候记的、是不是今天的。
   /// 面板存的是"最新一条日志"，昨天的完成态不能显示成今天的，所以必须说清日期。
   String _kindNote(Map<String, dynamic> k) {
@@ -352,32 +396,30 @@ class AccountDetailPage extends StatelessWidget {
     bool doneToday(String source) => pickBool((tasks[source] as Map?)?.cast<String, dynamic>(), ['todayDone']);
 
     final punch = _kind('punch');
+    final cards = _kind('punch-cards');
     final search = _kind('search-today');
-    final app = _kind('app-checkin-today');
 
     return PanelCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SectionTitle('打卡情况'),
         const SizedBox(height: 2),
-        ProgressRow(
-          label: '印章收集',
-          // 单位不写死：面板给的可能是"3/12 个印章"，也可能是退回的"几张卡完成几张"，
-          // 数字本身配格子就够了，标错单位比不标更糟
-          value: punch.isEmpty ? null : '${pickInt(punch, ['days'])}/${pickInt(punch, ['daysMax'])}',
-          dots: punch.isEmpty ? const [] : _cells(pickInt(punch, ['days']), pickInt(punch, ['daysMax'])),
-          dotCell: 16,
-          note: _kindNote(punch),
-        ),
-        ProgressRow(
-          label: '必应搜索',
-          value: '连续 ${streakOf('search')} 天',
-          dots: _sourceDays('search'),
-          note: search.isEmpty
-              ? '今日 ${doneToday('search') ? '已打卡' : '未打卡'} · 方格=最近 7 天'
-              // 机器人那行 "Desktop: 60/60" 是 pointProgress/pointProgressMax，
-              // 也就是积分额度，不是搜索次数（SearchProgress.summarize 里加的就是分数）
-              : '今日 ${pickInt(search, ['days'])}/${pickInt(search, ['daysMax'])} 分 · ${doneToday('search') ? '已拿满' : '未拿满'}',
-        ),
+        if (punch.isNotEmpty)
+          ProgressRow(
+            label: '印章收集',
+            value: '${pickInt(punch, ['days'])}/${pickInt(punch, ['daysMax'])}',
+            dots: _cells(pickInt(punch, ['days']), pickInt(punch, ['daysMax'])),
+            dotCell: 16,
+            note: _kindNote(punch),
+          )
+        else
+          // 只拿到"几张卡"的时候不画格子：两个空格子会被读成"总共只有两枚印章"
+          ProgressRow(
+            label: '印章收集',
+            value: cards.isEmpty ? null : '${pickInt(cards, ['days'])}/${pickInt(cards, ['daysMax'])} 张卡',
+            note: cards.isEmpty ? _kindNote(const {}) : '${_kindNote(cards)} · 等 bot 读到页面上的 n/12 才画格子',
+          ),
+        _streakRow('必应搜索', const ['streak-bing', 'streak-search', 'dailystreaks_bing'],
+            fallbackDots: _sourceDays('search'), fallbackStreak: streakOf('search')),
         ProgressRow(
           label: '每日打卡',
           // 必须是 ${_overallStreak()} —— 写 $_overallStreak() 只会插值函数本身，
@@ -387,31 +429,34 @@ class AccountDetailPage extends StatelessWidget {
           note: '拿到过积分就算一天 · 实心格=有分',
           color: T.amber500,
         ),
-        ProgressRow(
-          label: '必应 App',
-          value: '连续 ${streakOf('checkIn')} 天',
-          dots: _sourceDays('checkIn'),
-          note: app.isEmpty ? _kindNote(const {}) : _kindNote(app),
-          color: T.purple500,
-        ),
+        _streakRow('必应 App', const ['streak-mobile', 'streak-app', 'dailystreaks_mobile'],
+            fallbackDots: _sourceDays('checkIn'), fallbackStreak: streakOf('checkIn'), color: T.purple500),
+        if (search.isNotEmpty)
+          // 机器人那行 "Desktop: 60/60" 是 pointProgress/pointProgressMax，
+          // 也就是积分额度，不是搜索次数（SearchProgress.summarize 里加的就是分数）
+          ProgressRow(
+            label: '今日搜索额度',
+            value: '${pickInt(search, ['days'])}/${pickInt(search, ['daysMax'])} 分',
+            note: '${_kindNote(search)} · ${doneToday('search') ? '今天已计分' : '今天还没计分'}',
+          ),
       ]),
     );
   }
 
   /// 升级活动打卡进度：默认搜索引擎 / 每日活动 / 必应 App 签到。
-  /// 优先用 bot 从 level_info 读到的"x/y 天"（level-* 那几种），
+  /// 优先用 bot 从页面/level_info 里读到的结构化 x/y（kind 名带 partner，只能按关键字认），
   /// 那一行还没出现过时退回日志完成态（*-today），两者都没有就明说没记录。
   Widget _levelUpCard(BuildContext context) {
-    Widget row(String label, String daysKind, String todayKind, Color color, List<bool> dots) {
-      final d = _kind(daysKind);
+    Widget row(String label, List<String> keywords, String unit, String todayKind, Color color, List<bool> dots) {
+      final d = _kindLike(keywords);
       final t = _kind(todayKind);
       if (d.isNotEmpty) {
         final days = pickInt(d, ['days']);
         final max = pickInt(d, ['daysMax'], 1);
         return ProgressRow(
           label: label,
-          value: '$days/$max 天',
-          // 天数型进度一律用格子：一格一天，一眼能数出还差几天
+          value: '$days/$max $unit',
+          // 一格一天/一项，一眼能数出还差几格
           dots: _cells(days, max),
           dotCell: max > 16 ? 11 : 15,
           note: _kindNote(d),
@@ -437,9 +482,11 @@ class AccountDetailPage extends StatelessWidget {
           Text('奖励在下一个日历月初发放', style: TextStyle(fontSize: 10, color: T.subText(context))),
         ]),
         const SizedBox(height: 2),
-        row('默认搜索引擎', 'default-search', '', T.primary, const []),
-        row('每日活动', 'level-dailyset', 'daily-set-today', T.green500, _sourceDays('urlReward')),
-        row('必应 App 签到', 'level-dailystreaks_mobile', 'app-checkin-today', T.purple500, _sourceDays('checkIn')),
+        row('默认搜索引擎', const ['default-search'], '天', '', T.primary, const []),
+        row('每日活动', const ['dailyset', 'tasks-daily', 'streak-daily'], '项', 'daily-set-today', T.green500,
+            _sourceDays('urlReward')),
+        row('必应 App 签到', const ['dailystreaks_mobile', 'tasks-mobile', 'streak-mobile', 'streak-app'], '项',
+            'app-checkin-today', T.purple500, _sourceDays('checkIn')),
       ]),
     );
   }

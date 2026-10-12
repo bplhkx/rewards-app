@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/panel.dart';
 import '../core/tokens.dart';
 import '../core/util.dart';
+import '../widgets/glass_dock.dart';
 import '../widgets/ui.dart';
 
 class LogsPage extends StatefulWidget {
@@ -149,7 +150,7 @@ class _LogsPageState extends State<LogsPage> {
                       },
                       child: ListView.builder(
                           controller: _sc,
-                          padding: const EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, 56),
+                          padding: EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, GlassDock.reserve(context)),
                           itemCount: _rows.length,
                           itemBuilder: (context, i) {
                             final r = _rows[i];
@@ -191,7 +192,8 @@ class _LogsPageState extends State<LogsPage> {
                     if (_behind > 0)
                       Positioned(
                         right: T.pagePad,
-                        bottom: T.pagePad,
+                        // 悬浮 dock 浮在内容上，这颗按钮要停在它上面
+                        bottom: GlassDock.reserve(context) - 16,
                         child: FilledButton.icon(
                           onPressed: () => _setFollow(true),
                           style: FilledButton.styleFrom(

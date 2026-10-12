@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/panel.dart';
 import '../core/tokens.dart';
 import '../core/util.dart';
+import '../widgets/glass_dock.dart';
 import '../widgets/trend_chart.dart';
 import '../widgets/ui.dart';
 
@@ -135,7 +136,8 @@ class _HomePageState extends State<HomePage> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(T.pagePad),
+        // 底部要给悬浮 dock 留位：它浮在内容之上，不留白最后一张卡会被压住
+        padding: EdgeInsets.fromLTRB(T.pagePad, T.pagePad, T.pagePad, GlassDock.reserve(context) + T.gap),
         children: [
           if (_err != null) ...[ErrorBanner(_err!, onRetry: _load), const SizedBox(height: T.gap)],
           _statusCard(context),

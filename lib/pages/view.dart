@@ -7,6 +7,7 @@ import '../core/api.dart';
 import '../core/mjpeg.dart';
 import '../core/util.dart';
 import '../core/tokens.dart';
+import '../widgets/glass_dock.dart';
 import '../widgets/ui.dart';
 
 /// 接管视图：MJPEG 画面 + 点按回传 + 交还按钮。
@@ -119,7 +120,7 @@ class _ViewPageState extends State<ViewPage> {
   Widget build(BuildContext context) {
     final active = _st?['active'] == true;
     return ListView(
-      padding: const EdgeInsets.all(T.pagePad),
+      padding: EdgeInsets.fromLTRB(T.pagePad, T.pagePad, T.pagePad, GlassDock.reserve(context) + T.gap),
       children: [
         PanelCard(
           padding: const EdgeInsets.symmetric(horizontal: T.gap, vertical: 10),
