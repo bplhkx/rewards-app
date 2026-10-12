@@ -27,6 +27,16 @@ class Settings {
   static bool get dark => _p?.getBool('dark') ?? false;
   static set dark(bool v) => _p?.setBool('dark', v);
 
+  /// 账号页的展示形态：0=详细·柱状图，1=详细·热力图，2=双列紧凑（一屏看四个）
+  /// 旧版本存的是布尔 chartHeatmap，这里顺带迁移一次。
+  static int get viewMode {
+    final stored = _p?.getInt('viewMode');
+    if (stored != null) return stored.clamp(0, 2);
+    return (_p?.getBool('chartHeatmap') ?? false) ? 1 : 0;
+  }
+
+  static set viewMode(int v) => _p?.setInt('viewMode', v.clamp(0, 2));
+
   static String _s(String k) => _p?.getString(k)?.trim() ?? '';
 
   /// 面板地址的主机部分，视图地址就跟着它走。

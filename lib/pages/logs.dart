@@ -86,7 +86,20 @@ class _LogsPageState extends State<LogsPage> {
       Expanded(
         child: _err != null
             ? Padding(padding: const EdgeInsets.all(T.pagePad), child: ErrorBanner(_err!, onRetry: _load))
-            : ListView.builder(
+            : _rows.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(T.pagePad),
+                    child: PanelCard(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
+                        child: Text(
+                          '暂无日志。日志缓冲在 bot 的内存里（2000 行），Control API 一重启就清空 —— 刚重启过或还没开跑就是这个样子，跑起来会自动出现。',
+                          style: TextStyle(fontSize: 12.5, height: 1.6, color: T.subText(context)),
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
                 controller: _sc,
                 padding: const EdgeInsets.fromLTRB(T.pagePad, 0, T.pagePad, T.pagePad),
                 itemCount: _rows.length,
@@ -110,7 +123,7 @@ class _LogsPageState extends State<LogsPage> {
                       Row(children: [
                         Container(width: 6, height: 6, decoration: BoxDecoration(color: _levelColor(level), borderRadius: T.pill)),
                         const SizedBox(width: 6),
-                        Text(ts.length > 16 ? ts.substring(5, 16) : ts,
+                        Text(logClock(ts),
                             style: TextStyle(fontSize: 10, color: T.subText(context))),
                         const SizedBox(width: 8),
                         Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _levelColor(level))),
