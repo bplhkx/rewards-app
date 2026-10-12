@@ -68,26 +68,27 @@ class StreakDots extends StatelessWidget {
   }
 }
 
-/// 一条进度：左边名字，右边数值，下面可选的进度条或点阵。
+/// 一条进度：左边名字，右边数值，下面用方格表示进度或最近 N 天。
+/// 一律只用方格 —— 条状进度在手机上看不出刻度，"14 天里的第 3 天"数格子比看色带快。
 class ProgressRow extends StatelessWidget {
   const ProgressRow({
     super.key,
     required this.label,
     this.value,
-    this.ratio,
     this.dots,
     this.note,
     this.color = T.primary,
+    this.dotCell = 12,
   });
 
   final String label;
   final String? value;
 
-  /// 0..1 的完成度；给了就画条
-  final double? ratio;
+  /// 方格：true = 这一格已完成/当天有分
   final List<bool>? dots;
   final String? note;
   final Color color;
+  final double dotCell;
 
   @override
   Widget build(BuildContext context) {
@@ -99,21 +100,9 @@ class ProgressRow extends StatelessWidget {
           if (value != null)
             Text(value!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
         ]),
-        if (ratio != null) ...[
-          const SizedBox(height: 5),
-          ClipRRect(
-            borderRadius: T.sm,
-            child: LinearProgressIndicator(
-              value: ratio!.clamp(0.0, 1.0),
-              minHeight: 6,
-              backgroundColor: color.withValues(alpha: 0.14),
-              valueColor: AlwaysStoppedAnimation(color),
-            ),
-          ),
-        ],
-        if (dots != null) ...[
+        if (dots != null && dots!.isNotEmpty) ...[
           const SizedBox(height: 6),
-          StreakDots(days: dots!, color: color),
+          StreakDots(days: dots!, color: color, cell: dotCell),
         ],
         if (note != null) ...[
           const SizedBox(height: 4),

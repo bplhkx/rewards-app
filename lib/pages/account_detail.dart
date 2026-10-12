@@ -337,6 +337,14 @@ class AccountDetailPage extends StatelessWidget {
     return n;
   }
 
+  /// x/y 的进度画成 y 个格子（前 x 个填色）。手机上条状进度没有刻度，
+  /// "14 天里的第 3 天"数格子比看色带快；格子数封顶 31，避免 60/60 那种撑满一屏。
+  List<bool> _cells(int done, int total) {
+    if (total <= 0) return const [];
+    final n = total > 31 ? 31 : total;
+    return List.generate(n, (i) => i < done);
+  }
+
   /// 打卡情况：印章收集 / 必应搜索 / 每日打卡 / 必应 App
   Widget _checkinCard(BuildContext context) {
     final tasks = (checkins['tasks'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
@@ -354,16 +362,16 @@ class AccountDetailPage extends StatelessWidget {
         ProgressRow(
           label: '印章收集',
           value: punch.isEmpty ? null : '${pickInt(punch, ['days'])}/${pickInt(punch, ['daysMax'])} 组',
-          ratio: punch.isEmpty ? null : pickInt(punch, ['days']) / (pickInt(punch, ['daysMax'], 1) == 0 ? 1 : pickInt(punch, ['daysMax'])),
+          dots: punch.isEmpty ? const [] : _cells(pickInt(punch, ['days']), pickInt(punch, ['daysMax'])),
+          dotCell: 16,
           note: _kindNote(punch),
         ),
         ProgressRow(
           label: '必应搜索',
           value: '连续 ${streakOf('search')} 天',
-          ratio: search.isEmpty ? null : pickInt(search, ['days']) / (pickInt(search, ['daysMax'], 1) == 0 ? 1 : pickInt(search, ['daysMax'])),
           dots: _sourceDays('search'),
           note: search.isEmpty
-              ? '今日 ${doneToday('search') ? '已打卡' : '未打卡'} · 连续天数来自每日积分固化'
+              ? '今日 ${doneToday('search') ? '已打卡' : '未打卡'} · 方格=最近 7 天'
               // 机器人那行 "Desktop: 60/60" 是 pointProgress/pointProgressMax，
               // 也就是积分额度，不是搜索次数（SearchProgress.summarize 里加的就是分数）
               : '今日 ${pickInt(search, ['days'])}/${pickInt(search, ['daysMax'])} 分 · ${doneToday('search') ? '已拿满' : '未拿满'}',
@@ -374,7 +382,7 @@ class AccountDetailPage extends StatelessWidget {
           // 屏幕上就冒出 "Closure: () => int from Function '_overallStreak'"
           value: '连续 ${_overallStreak()} 天',
           dots: _anyDays(),
-          note: '拿到过积分就算一天 · 实心点=有分',
+          note: '拿到过积分就算一天 · 实心格=有分',
           color: T.amber500,
         ),
         ProgressRow(
@@ -396,12 +404,14 @@ class AccountDetailPage extends StatelessWidget {
       final d = _kind(daysKind);
       final t = _kind(todayKind);
       if (d.isNotEmpty) {
-        final max = pickInt(d, ['daysMax'], 1) == 0 ? 1 : pickInt(d, ['daysMax'], 14);
+        final days = pickInt(d, ['days']);
+        final max = pickInt(d, ['daysMax'], 1);
         return ProgressRow(
           label: label,
-          value: '${pickInt(d, ['days'])}/${pickInt(d, ['daysMax'])} 天',
-          ratio: pickInt(d, ['days']) / max,
-          dots: dots,
+          value: '$days/$max 天',
+          // 天数型进度一律用格子：一格一天，一眼能数出还差几天
+          dots: _cells(days, max),
+          dotCell: max > 16 ? 11 : 15,
           note: _kindNote(d),
           color: color,
         );
