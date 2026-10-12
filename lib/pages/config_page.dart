@@ -39,6 +39,7 @@ class _ConfigPageState extends State<ConfigPage> {
     'doDesktopSearch': '桌面端搜索',
     'doMobileSearch': '移动端搜索',
     'doVisualSearch': '视觉搜索',
+    'doDefaultSearchEngine': '默认搜索引擎打卡',
     'doActivateSearchPerk': '激活搜索特权',
     'doDailyCheckIn': '每日签到',
     'doReadToEarn': '阅读赚分',
