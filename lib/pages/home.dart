@@ -202,7 +202,7 @@ class _HomePageState extends State<HomePage> {
           ]),
           const SizedBox(height: 10),
           if (!_reachable) ...[
-            Text(pickStr(_status, ['lastError'], '面板说 Control API 不可达'),
+            Text(pickStr(_status, ['lastError'], 'Control API 不可达'),
                 style: TextStyle(fontSize: 12, color: T.subText(context))),
             const SizedBox(height: 10),
           ],

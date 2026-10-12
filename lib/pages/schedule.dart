@@ -170,25 +170,18 @@ class _SchedulePageState extends State<SchedulePage> {
               const SectionTitle('哪一边的定时'),
               const SizedBox(height: 10),
               Row(children: [
-                Expanded(child: _sourceCard('面板', '面板到点叫 bot 开跑', !_onRemote, () => _pick(false))),
+                Expanded(child: _sourceCard('面板', '面板叫 bot 开跑', !_onRemote, () => _pick(false))),
                 const SizedBox(width: T.gap),
                 Expanded(
                   child: _sourceCard(
                     'bot',
-                    _remoteSupported ? 'bot 容器里的 cron' : '这版 bot 不支持',
+                    _remoteSupported ? 'bot 的 cron' : '这版 bot 不支持',
                     _onRemote,
                     () => _pick(true),
                     enabled: _remoteSupported,
                   ),
                 ),
               ]),
-              const SizedBox(height: 8),
-              Text(
-                _onRemote
-                    ? '写的是 Control API 的 /schedule（经面板代理）。真正触发的是 bot 那边的 cron。'
-                    : '写的是面板自己的调度器：到点由面板发 /api/control/start，nextRunAt 由面板算。',
-                style: TextStyle(fontSize: 11, height: 1.5, color: T.subText(context)),
-              ),
             ]),
           ),
           const SizedBox(height: T.gap),
@@ -270,7 +263,6 @@ class _SchedulePageState extends State<SchedulePage> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('正在跑就跳过这次', style: TextStyle(fontSize: 13)),
-                subtitle: const Text('上一轮没结束时到点不再启动新的', style: TextStyle(fontSize: 11)),
                 value: cur['skipIfRunning'] != false,
                 activeColor: T.primary,
                 onChanged: (v) => setState(() => (_cur ?? _local!)['skipIfRunning'] = v),

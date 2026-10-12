@@ -60,7 +60,7 @@ class _ViewPageState extends State<ViewPage> {
     setState(() {
       _frame = null;
       _size = null;
-      _err = widget.token.isEmpty ? '还没配置视图 token（更多 → 地址与凭据 → 视图 token）' : null;
+      _err = widget.token.isEmpty ? '未配置视图 token' : null;
     });
     if (widget.token.isEmpty) return;
     final s = MjpegStream(_url);
@@ -195,7 +195,7 @@ class _ViewPageState extends State<ViewPage> {
           ),
         ]),
         const SizedBox(height: 8),
-        Text('点画面 = 把点击回传给无头浏览器；坐标按画面实际显示区域换算。',
+        Text('点画面 = 回传点击给无头浏览器',
             style: TextStyle(fontSize: 11, color: T.subText(context))),
       ],
     );

@@ -217,7 +217,6 @@ class _ConfigPageState extends State<ConfigPage> {
                           labelOf(key),
                           style: TextStyle(fontSize: 13, fontWeight: changed ? FontWeight.w700 : FontWeight.w400, color: changed ? T.primary : null),
                         ),
-                        subtitle: Text(p, style: TextStyle(fontSize: 10, color: T.subText(context))),
                         value: on,
                         activeColor: T.primary,
                         onChanged: (v) => _set(p, v),
@@ -233,7 +232,7 @@ class _ConfigPageState extends State<ConfigPage> {
               for (final d in delays)
                 if (getDeep(c, d) is Map) _delayRow(d, getDeep(c, d) as Map),
               const SizedBox(height: 6),
-              Text('格式支持 30sec / 2min / 1min30sec，也可以直接填毫秒数',
+              Text('支持 30sec / 2min / 1min30sec 或毫秒数',
                   style: TextStyle(fontSize: 11, color: T.subText(context))),
             ]),
           ),

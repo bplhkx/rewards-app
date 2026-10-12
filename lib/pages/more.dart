@@ -38,7 +38,7 @@ class _MorePageState extends State<MorePage> {
   bool _save() {
     final url = _panelBase.text.trim();
     if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('面板地址不能空着，否则哪儿也连不上')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('面板地址不能空')));
       return false;
     }
     Settings.panelBase = url;
@@ -78,7 +78,7 @@ class _MorePageState extends State<MorePage> {
         name: 'bot（经面板）',
         result: s['reachable'] == true
             ? 'v${s['version']} · ${s['botState']} · 已连 ${minutes(s['uptimeSec'] is num ? s['uptimeSec'] as num : 0)} 分钟'
-            : '面板说不可达：${s['lastError'] ?? '未知'}',
+            : '不可达：${s['lastError'] ?? '未知'}',
         ok: s['reachable'] == true
       ));
     } catch (e) {
@@ -99,7 +99,7 @@ class _MorePageState extends State<MorePage> {
         results.add((name: '接管视图', result: errText(e), ok: false));
       }
     } else {
-      results.add((name: '接管视图', result: '没填视图 token（可选项，不填就没有"视图"页）', ok: true));
+      results.add((name: '接管视图', result: '未填视图 token（可选）', ok: true));
     }
 
     if (!mounted) return;
@@ -134,7 +134,7 @@ class _MorePageState extends State<MorePage> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.schedule_rounded, size: 20, color: T.primary),
               title: const Text('定时跑', style: TextStyle(fontSize: 14)),
-              subtitle: const Text('面板 / bot 两边各自的 cron、哪些账号不参与', style: TextStyle(fontSize: 11)),
+              subtitle: const Text('面板 / bot 各自的 cron、排除账号', style: TextStyle(fontSize: 11)),
               trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SchedulePage(panel: widget.panel))),
             ),
@@ -154,9 +154,6 @@ class _MorePageState extends State<MorePage> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SectionTitle('地址与凭据'),
             const SizedBox(height: 6),
-            Text('只填面板地址。Control API 的地址和 token 都存在面板那边，App 里不再要第二份。',
-                style: TextStyle(fontSize: 11, height: 1.5, color: T.subText(context))),
-            const SizedBox(height: 10),
             TextField(key: const ValueKey("field-panelBase"), controller: _panelBase, keyboardType: TextInputType.url,
                 decoration: _dec('面板地址', 'http://192.168.1.4:8890')),
             const SizedBox(height: 8),
@@ -170,8 +167,8 @@ class _MorePageState extends State<MorePage> {
             const SizedBox(height: 6),
             Text(
               Settings.host.isEmpty
-                  ? '接管视图地址：填好面板地址后自动按 http://<面板主机>:8891 拼'
-                  : '接管视图地址（自动）：${Settings.viewBase}',
+                  ? '视图地址：按面板主机自动拼 :8891'
+                  : '视图地址（自动）：${Settings.viewBase}',
               style: TextStyle(fontSize: 11, color: T.subText(context)),
             ),
             const SizedBox(height: 12),
@@ -231,14 +228,7 @@ class _MorePageState extends State<MorePage> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SectionTitle('关于'),
             const SizedBox(height: 8),
-            Text('Rewards 手机端的原生客户端，视觉沿用呆呆面板 APP 的设计令牌：主色 #409EFF、slate 灰阶、圆角 8/12/14/pill、五页底部导航。\n\n'
-                '· 主页：实时状态、启停、近 7 天趋势\n'
-                '· 账号：当前积分 / 本次获得 / 连胜，常驻批量运行 + 下次自动运行时间\n'
-                '· 日志：bot 的滚动日志，可按级别过滤\n'
-                '· 视图：无头浏览器的 MJPEG 画面，点哪打哪（需单独填视图 token）\n'
-                '· 更多：面板地址、连通性自检\n\n'
-                '所有请求都打到面板一个地址：读走面板的 sqlite，启停/参数/定时经面板的 /api/control、/api/config、/api/schedule 代理，'
-                '所以 App 里不需要 bot 的 token。',
+            Text('Rewards 手机端原生客户端。所有请求只打面板一个地址，App 不持有 bot 的 token。',
                 style: TextStyle(fontSize: 12, height: 1.6, color: T.subText(context))),
           ]),
         ),

@@ -95,7 +95,7 @@ class _SetupPageState extends State<SetupPage> {
             const SizedBox(height: 14),
             const Text('连上你的 Rewards 面板', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text('只要面板地址。Control API 的地址和 token 都在面板那边配好了，App 不碰；\n定时、参数、启停全部经面板代理。',
+            Text('只填面板地址；定时、参数、启停都经面板代理。',
                 style: TextStyle(fontSize: 12.5, height: 1.6, color: T.subText(context))),
             const SizedBox(height: 18),
             PanelCard(
@@ -111,7 +111,7 @@ class _SetupPageState extends State<SetupPage> {
                 TextButton.icon(
                   onPressed: () => setState(() => _showAuth = !_showAuth),
                   icon: Icon(_showAuth ? Icons.expand_less : Icons.expand_more, size: 18),
-                  label: Text(_showAuth ? '收起鉴权' : '面板开了 Basic auth 才要填', style: const TextStyle(fontSize: 12)),
+                  label: Text(_showAuth ? '收起鉴权' : '面板开了鉴权才填', style: const TextStyle(fontSize: 12)),
                 ),
                 if (_showAuth)
                   Column(children: [
@@ -155,7 +155,7 @@ class _SetupPageState extends State<SetupPage> {
               ]),
             ),
             const SizedBox(height: 14),
-            Text('提示：bot 和面板在同一台手机上时，地址填那台机器的局域网 IP（别填 127.0.0.1，那是手机自己）；面板默认端口 8890。',
+            Text('同一台手机上时填局域网 IP，别填 127.0.0.1；面板默认端口 8890。',
                 style: TextStyle(fontSize: 11.5, height: 1.6, color: T.subText(context))),
           ],
         ),

@@ -86,10 +86,15 @@ class StatTile extends StatelessWidget {
                 children: [
                   Text(label, style: TextStyle(fontSize: 11, color: T.subText(context))),
                   const SizedBox(height: 2),
-                  Text(value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  // 数值可能很大（余额是各账号积分之和），用 scaleDown 整体缩到装得下，
+                  // 而不是截成省略号。
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value,
+                        maxLines: 1,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
                 ],
               ),
             ),

@@ -93,7 +93,7 @@ class _LogsPageState extends State<LogsPage> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
                         child: Text(
-                          '暂无日志。日志缓冲在 bot 的内存里（2000 行），Control API 一重启就清空 —— 刚重启过或还没开跑就是这个样子，跑起来会自动出现。',
+                          '暂无日志（缓冲在 bot 内存，重启即清空）',
                           style: TextStyle(fontSize: 12.5, height: 1.6, color: T.subText(context)),
                         ),
                       ),

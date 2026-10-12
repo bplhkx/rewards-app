@@ -79,7 +79,7 @@ class AccountDetailPage extends StatelessWidget {
               ]),
               const SizedBox(height: 8),
               if (dayRows.isEmpty)
-                Text('面板里还没有今天的固化记录 —— 这个表是跑动过程中每次状态更新时写的，跑完一轮就一定有。',
+                Text('还没有今天的记录',
                     style: TextStyle(fontSize: 12, height: 1.5, color: T.subText(context)))
               else
                 ..._bars(dayRows),
@@ -112,13 +112,10 @@ class AccountDetailPage extends StatelessWidget {
               Divider(color: T.hairline(context), height: 1),
               const SizedBox(height: 8),
               if (liveRows.isEmpty)
-                Text('本轮还没有分类记录。bot 内存里的 bySource 在新一轮开始或 Control API 重启时清零 —— 想留住就看上面"今天"那块。',
+                Text('本轮还没有分类记录',
                     style: TextStyle(fontSize: 11.5, height: 1.5, color: T.subText(context)))
-              else ...[
+              else
                 ..._bars(liveRows),
-                const SizedBox(height: 6),
-                Text('键名 ${liveRows.map((e) => e.key).join(" / ")}', style: TextStyle(fontSize: 10, color: T.slate400)),
-              ],
             ]),
           ),
           const SizedBox(height: T.gap),
@@ -128,13 +125,13 @@ class AccountDetailPage extends StatelessWidget {
               Row(children: [
                 const SectionTitle('每日分类历史'),
                 const Spacer(),
-                Text('面板 daily_points · ${daily.length} 天', style: TextStyle(fontSize: 11, color: T.subText(context))),
+                Text('${daily.length} 天', style: TextStyle(fontSize: 11, color: T.subText(context))),
               ]),
               const SizedBox(height: 6),
               if (daily.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text('还没有历史（这张表是刚加的，从今天这一轮开始往后攒）。',
+                  child: Text('还没有历史',
                       style: TextStyle(fontSize: 12, color: T.subText(context))),
                 )
               else
@@ -203,13 +200,13 @@ class AccountDetailPage extends StatelessWidget {
               Row(children: [
                 const SectionTitle('历史逐次记录'),
                 const Spacer(),
-                Text('面板 sqlite · ${history.length} 次', style: TextStyle(fontSize: 11, color: T.subText(context))),
+                Text('${history.length} 次', style: TextStyle(fontSize: 11, color: T.subText(context))),
               ]),
               const SizedBox(height: 6),
               if (history.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text('面板里还没有这个账号的历史（跑完一轮才会落库）', style: TextStyle(fontSize: 12, color: T.subText(context))),
+                  child: Text('还没有记录', style: TextStyle(fontSize: 12, color: T.subText(context))),
                 )
               else
                 ...history.reversed.take(14).map((h) {
