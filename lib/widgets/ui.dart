@@ -37,6 +37,93 @@ class PanelCard extends StatelessWidget {
   }
 }
 
+/// 一排小格子表示"最近 N 天有没有打卡"：填了色的那天有分，空心是没跑/没拿分。
+/// 连续天数光写个数字看不出趋势，这种点阵一眼就能看出哪几天断了。
+class StreakDots extends StatelessWidget {
+  const StreakDots({super.key, required this.days, this.color = T.primary, this.cell = 12});
+
+  /// 从最近一天往前排（与 [days] 的顺序一致：下标 0 = 今天）
+  final List<bool> days;
+  final Color color;
+  final double cell;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 3,
+      runSpacing: 3,
+      children: [
+        for (var i = 0; i < days.length; i++)
+          Container(
+            width: cell,
+            height: cell,
+            decoration: BoxDecoration(
+              color: days[i] ? color : Colors.transparent,
+              border: Border.all(color: days[i] ? color : T.hairline(context)),
+              borderRadius: BorderRadius.circular(cell * 0.28),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 一条进度：左边名字，右边数值，下面可选的进度条或点阵。
+class ProgressRow extends StatelessWidget {
+  const ProgressRow({
+    super.key,
+    required this.label,
+    this.value,
+    this.ratio,
+    this.dots,
+    this.note,
+    this.color = T.primary,
+  });
+
+  final String label;
+  final String? value;
+
+  /// 0..1 的完成度；给了就画条
+  final double? ratio;
+  final List<bool>? dots;
+  final String? note;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          if (value != null)
+            Text(value!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+        ]),
+        if (ratio != null) ...[
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: T.sm,
+            child: LinearProgressIndicator(
+              value: ratio!.clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: color.withValues(alpha: 0.14),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+        ],
+        if (dots != null) ...[
+          const SizedBox(height: 6),
+          StreakDots(days: dots!, color: color),
+        ],
+        if (note != null) ...[
+          const SizedBox(height: 4),
+          Text(note!, style: TextStyle(fontSize: 10.5, color: T.subText(context))),
+        ],
+      ]),
+    );
+  }
+}
+
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing});
   final String text;

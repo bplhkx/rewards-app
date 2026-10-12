@@ -16,6 +16,7 @@ class AccountDetailPage extends StatelessWidget {
     required this.history,
     this.daily = const [],
     this.today = '',
+    this.todayTotal = 0,
     this.checkins = const {},
     this.running = false,
   });
@@ -34,6 +35,9 @@ class AccountDetailPage extends StatelessWidget {
 
   /// 面板给的"今天"（北京日期 YYYY-MM-DD）
   final String today;
+
+  /// 今日合计：面板 account_history 里今天每轮 gained 相加（和主页"今日"同源）
+  final int todayTotal;
 
   /// 面板 /api/accounts 的 checkins[email]：
   /// {today, tasks:{source:{streak,todayDone}}, checkins:{'default-search':{days,daysMax,status,ts}}}
@@ -60,6 +64,7 @@ class AccountDetailPage extends StatelessWidget {
             : (_ls['bySource'] as Map?));
     final dayRow = _todayRow;
     final dayRows = pointBreakdown(dayRow?['sources'] as Map?);
+    final dayTotal = todayTotal;
     final collected = pickInt(live, ['collectedPoints'], pickInt(_ls, ['gained'], pickInt(account, ['lastGained'])));
     final initial = pickInt(live, ['initialPoints'], pickInt(account, ['lastPoints']) - collected);
     final finalPts = pickInt(live, ['finalPoints'], pickInt(_ls, ['balance'], pickInt(account, ['lastPoints'])));
@@ -87,7 +92,7 @@ class AccountDetailPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(T.pagePad),
         children: [
-          // ---------- 今天（面板固化，跑完会留住） ----------
+          // ---------- 今天（合计以每轮记录为准，分类明细来自固化表） ----------
           PanelCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -95,20 +100,32 @@ class AccountDetailPage extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(today.isEmpty ? '--' : today, style: TextStyle(fontSize: 11.5, color: T.subText(context))),
                 const Spacer(),
-                if (dayRows.isNotEmpty)
-                  Pill('+${pickInt(dayRow, ['total'])}', color: T.green500),
+                Pill('+${dayTotal > 0 ? dayTotal : pickInt(dayRow, ['total'])}', color: T.green500),
               ]),
               const SizedBox(height: 8),
               if (dayRows.isEmpty)
-                Text('还没有今天的记录',
+                Text(dayTotal > 0 ? '今天拿了 $dayTotal 分，但还没有分类明细' : '还没有今天的记录',
                     style: TextStyle(fontSize: 12, height: 1.5, color: T.subText(context)))
-              else
+              else ...[
                 ..._bars(dayRows),
+                if (dayTotal > 0 && dayTotal != pickInt(dayRow, ['total']))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    // 明细按轮固化，账本上线之前的天数会偏少；合计一律用每轮记录，两者
+                    // 不一致时把差说出来，别让人以为数字是随便挑的。
+                    child: Text(
+                      '分类明细合计 ${pickInt(dayRow, ['total'])} 分，与每轮记录合计 $dayTotal 分差 ${dayTotal - pickInt(dayRow, ['total'])} 分',
+                      style: TextStyle(fontSize: 10.5, height: 1.5, color: T.amber500),
+                    ),
+                  ),
+              ],
             ]),
           ),
           const SizedBox(height: T.gap),
-          // ---------- 打卡情况（面板 checkinSummary：连续天数 + 跨天活动进度） ----------
+          // ---------- 打卡情况（面板 checkin_progress + daily_points 连续天数） ----------
           _checkinCard(context),
+          const SizedBox(height: T.gap),
+          _levelUpCard(context),
           const SizedBox(height: T.gap),
           // ---------- 本轮（bot 内存） ----------
           PanelCard(
@@ -266,95 +283,151 @@ class AccountDetailPage extends StatelessWidget {
     return '未开启';
   }
 
-  /// 打卡情况：跨天连续型活动（默认搜索引擎 x/14 天）+ 各分类的连续得分天数。
-  /// 连续天数由面板从 daily_points 倒推，今天还没跑不算断，只标"今日未打卡"。
+  /// 面板 checkin_progress 里的一类进度（punch / search-today / default-search / …）
+  Map<String, dynamic> _kind(String name) {
+    final v = (checkins['checkins'] as Map?)?[name];
+    return v is Map ? v.cast<String, dynamic>() : const <String, dynamic>{};
+  }
+
+  /// 右下角那句小字：什么时候记的、是不是今天的。
+  /// 面板存的是"最新一条日志"，昨天的完成态不能显示成今天的，所以必须说清日期。
+  String _kindNote(Map<String, dynamic> k) {
+    if (k.isEmpty) return '还没有记录 · bot 跑起来才会读进度';
+    final when = stampText(pickStr(k, ['ts']));
+    if (pickBool(k, ['today'])) return '${checkinStatusLabel(pickStr(k, ['status']))} · $when 记录';
+    return '$when 的记录 · 今天还没更新';
+  }
+
+  /// 最近 n 天里该分类当天有没有得分（下标 0 = 今天）
+  List<bool> _sourceDays(String source, {int n = 7}) {
+    final has = <String>{};
+    for (final d in daily) {
+      if (d is! Map) continue;
+      final src = d['sources'];
+      final v = src is Map ? num.tryParse('${src[source]}') : null;
+      if (v != null && v > 0) has.add('${d['day']}');
+    }
+    return _dayFlags(n, has);
+  }
+
+  /// 最近 n 天里"当天拿到过任何积分"的天
+  List<bool> _anyDays({int n = 7}) {
+    final has = <String>{
+      for (final d in daily.whereType<Map>())
+        if (pickInt(d.cast<String, dynamic>(), ['total']) > 0) '${d['day']}',
+    };
+    return _dayFlags(n, has);
+  }
+
+  List<bool> _dayFlags(int n, Set<String> has) {
+    // today 是面板给的北京日期；DateTime 不可变，这里必须是普通赋值而不是级联
+    final base = DateTime.tryParse(today) ?? DateTime.now();
+    return List.generate(n, (i) => has.contains(dayKey(base.subtract(Duration(days: i)))));
+  }
+
+  int _overallStreak() {
+    // 和面板同一套口径：今天还没跑不算断，从昨天往前数
+    final has = _anyDays(n: 90);
+    var n = 0;
+    var i = has[0] ? 0 : 1;
+    while (i < has.length && has[i]) {
+      n++;
+      i++;
+    }
+    return n;
+  }
+
+  /// 打卡情况：印章收集 / 必应搜索 / 每日打卡 / 必应 App
   Widget _checkinCard(BuildContext context) {
-    final dse = (checkins['checkins'] as Map?)?['default-search'];
     final tasks = (checkins['tasks'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-    // 已知分类按 labels 的顺序排，bot 将来加了新键也照样显示（原样透出键名）
-    final order = <String>[
-      for (final k in pointSourceLabels.keys)
-        if (tasks.containsKey(k)) k,
-      for (final k in tasks.keys)
-        if (!pointSourceLabels.containsKey(k)) k,
-    ];
+    int streakOf(String source) => pickInt((tasks[source] as Map?)?.cast<String, dynamic>(), ['streak']);
+    bool doneToday(String source) => pickBool((tasks[source] as Map?)?.cast<String, dynamic>(), ['todayDone']);
+
+    final punch = _kind('punch');
+    final search = _kind('search-today');
+    final app = _kind('app-checkin-today');
 
     return PanelCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const SectionTitle('打卡情况'),
-          const Spacer(),
-          Text('连续天数 · 近 90 天', style: TextStyle(fontSize: 10.5, color: T.subText(context))),
-        ]),
-        const SizedBox(height: 10),
-        if (dse is Map)
-          _dseRow(context, dse.cast<String, dynamic>())
-        else
-          Text('默认搜索引擎：还没有打卡进度记录（bot 每天跑的时候才会读进度）',
-              style: TextStyle(fontSize: 11.5, height: 1.5, color: T.subText(context))),
-        const SizedBox(height: 12),
-        Divider(color: T.hairline(context), height: 1),
-        const SizedBox(height: 8),
-        if (order.isEmpty)
-          Text('还没有分类打卡记录 —— 面板从今天起才把每日分类积分固化下来',
-              style: TextStyle(fontSize: 11.5, height: 1.5, color: T.subText(context)))
-        else
-          for (final k in order) _taskRow(context, k, tasks[k] as Map?),
+        const SectionTitle('打卡情况'),
+        const SizedBox(height: 2),
+        ProgressRow(
+          label: '印章收集',
+          value: punch.isEmpty ? null : '${pickInt(punch, ['days'])}/${pickInt(punch, ['daysMax'])} 组',
+          ratio: punch.isEmpty ? null : pickInt(punch, ['days']) / (pickInt(punch, ['daysMax'], 1) == 0 ? 1 : pickInt(punch, ['daysMax'])),
+          note: _kindNote(punch),
+        ),
+        ProgressRow(
+          label: '必应搜索',
+          value: '连续 ${streakOf('search')} 天',
+          ratio: search.isEmpty ? null : pickInt(search, ['days']) / (pickInt(search, ['daysMax'], 1) == 0 ? 1 : pickInt(search, ['daysMax'])),
+          dots: _sourceDays('search'),
+          note: search.isEmpty
+              ? '今日 ${doneToday('search') ? '已打卡' : '未打卡'} · 连续天数来自每日积分固化'
+              // 机器人那行 "Desktop: 60/60" 是 pointProgress/pointProgressMax，
+              // 也就是积分额度，不是搜索次数（SearchProgress.summarize 里加的就是分数）
+              : '今日 ${pickInt(search, ['days'])}/${pickInt(search, ['daysMax'])} 分 · ${doneToday('search') ? '已拿满' : '未拿满'}',
+        ),
+        ProgressRow(
+          label: '每日打卡',
+          // 必须是 ${_overallStreak()} —— 写 $_overallStreak() 只会插值函数本身，
+          // 屏幕上就冒出 "Closure: () => int from Function '_overallStreak'"
+          value: '连续 ${_overallStreak()} 天',
+          dots: _anyDays(),
+          note: '拿到过积分就算一天 · 实心点=有分',
+          color: T.amber500,
+        ),
+        ProgressRow(
+          label: '必应 App',
+          value: '连续 ${streakOf('checkIn')} 天',
+          dots: _sourceDays('checkIn'),
+          note: app.isEmpty ? _kindNote(const {}) : _kindNote(app),
+          color: T.purple500,
+        ),
       ]),
     );
   }
 
-  Widget _dseRow(BuildContext context, Map<String, dynamic> d) {
-    final days = pickInt(d, ['days']);
-    final max = pickInt(d, ['daysMax'], 14);
-    final ratio = max <= 0 ? 0.0 : (days / max).clamp(0.0, 1.0);
-    final done = days >= max && max > 0;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        const Text('默认搜索引擎', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const Spacer(),
-        Text('$days/$max 天',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: done ? T.green500 : T.primary)),
-      ]),
-      const SizedBox(height: 6),
-      // 14 天要一格一格数，画成进度条比看数字直观
-      Container(
-        height: 7,
-        decoration: BoxDecoration(color: T.slate500.withValues(alpha: 0.18), borderRadius: T.sm),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FractionallySizedBox(
-            widthFactor: ratio,
-            child: Container(decoration: BoxDecoration(color: done ? T.green500 : T.primary, borderRadius: T.sm)),
-          ),
-        ),
-      ),
-      const SizedBox(height: 5),
-      Text(
-        '${checkinStatusLabel(pickStr(d, ['status']))}${pickStr(d, ['ts']).isEmpty ? '' : ' · ${stampText(pickStr(d, ['ts']))} 记录'}',
-        style: TextStyle(fontSize: 10.5, color: T.subText(context)),
-      ),
-    ]);
-  }
+  /// 升级活动打卡进度：默认搜索引擎 / 每日活动 / 必应 App 签到。
+  /// 优先用 bot 从 level_info 读到的"x/y 天"（level-* 那几种），
+  /// 那一行还没出现过时退回日志完成态（*-today），两者都没有就明说没记录。
+  Widget _levelUpCard(BuildContext context) {
+    Widget row(String label, String daysKind, String todayKind, Color color, List<bool> dots) {
+      final d = _kind(daysKind);
+      final t = _kind(todayKind);
+      if (d.isNotEmpty) {
+        final max = pickInt(d, ['daysMax'], 1) == 0 ? 1 : pickInt(d, ['daysMax'], 14);
+        return ProgressRow(
+          label: label,
+          value: '${pickInt(d, ['days'])}/${pickInt(d, ['daysMax'])} 天',
+          ratio: pickInt(d, ['days']) / max,
+          dots: dots,
+          note: _kindNote(d),
+          color: color,
+        );
+      }
+      return ProgressRow(
+        label: label,
+        value: t.isEmpty
+            ? '未记录'
+            : (pickStr(t, ['status']) == 'complete' && pickBool(t, ['today']) ? '今日已完成' : '今日未完成'),
+        dots: dots,
+        note: t.isEmpty ? '还没有记录 · bot 跑起来才会读进度' : _kindNote(t),
+        color: color,
+      );
+    }
 
-  Widget _taskRow(BuildContext context, String key, Map? raw) {
-    final m = raw?.cast<String, dynamic>() ?? const <String, dynamic>{};
-    final streak = pickInt(m, ['streak']);
-    final todayDone = pickBool(m, ['todayDone']);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(children: [
-        SizedBox(width: 96, child: Text(pointSourceLabels[key] ?? key, style: const TextStyle(fontSize: 12.5))),
-        Icon(todayDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-            size: 15, color: todayDone ? T.green500 : T.slate400),
-        const SizedBox(width: 5),
-        Text(todayDone ? '今日已打卡' : '今日未打卡',
-            style: TextStyle(fontSize: 11.5, color: todayDone ? T.green500 : T.subText(context))),
-        const Spacer(),
-        Text('连续 $streak 天', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+    return PanelCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const SectionTitle('升级活动打卡进度'),
+          const Spacer(),
+          Text('奖励在下一个日历月初发放', style: TextStyle(fontSize: 10, color: T.subText(context))),
+        ]),
+        const SizedBox(height: 2),
+        row('默认搜索引擎', 'default-search', '', T.primary, const []),
+        row('每日活动', 'level-dailyset', 'daily-set-today', T.green500, _sourceDays('urlReward')),
+        row('必应 App 签到', 'level-dailystreaks_mobile', 'app-checkin-today', T.purple500, _sourceDays('checkIn')),
       ]),
     );
   }

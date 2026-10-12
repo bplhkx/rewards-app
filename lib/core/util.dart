@@ -127,16 +127,14 @@ String dateTimeText(String raw) {
   return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}';
 }
 
-/// 打卡类活动的 kind（面板 checkin_progress 的键）→ 中文。
-const Map<String, String> checkinKindLabels = {
-  'default-search': '默认搜索引擎',
-};
-
+/// 面板 checkin_progress 的 status → 中文。kind 的中文名在各页面按卡片语义写，
+/// 因为同一个 kind 在"打卡情况"和"升级活动"两张卡里的叫法不一样。
 String checkinStatusLabel(String status) => switch (status) {
       'advanced' => '今日已推进',
-      'complete' => '已全部完成',
+      'complete' => '已完成',
       'stalled' => '今日未计入',
       'started' => '打卡中',
+      'progress' => '进行中',
       _ => '进度',
     };
 

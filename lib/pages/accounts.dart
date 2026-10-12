@@ -108,13 +108,22 @@ class _AccountsPageState extends State<AccountsPage> {
       ((_data?['dailyPoints'] as Map?)?[email] as List?) ?? const [];
   String get _today => pickStr(_data, ['today']);
 
-  /// 面板固化的"今天"分类合计；今天还没跑就退回上一轮的 gained ——
-  /// 否则凌晨到下一次跑之间，卡片会显示"今日 +0"，看着像没干活。
+  /// 今日合计：以面板 account_history 的**每轮记录**为准 —— 主页的"今日"也是从机器人
+  /// 自己的每轮结果算出来的，两边同源才不会一个说 +2094、一个说 +1993。
+  /// daily_points 只负责分类明细：它以前按天存 MAX，一天跑两轮会把第二轮吞掉
+  /// （10-12 实测就少了 101 分），现在改成按轮记账，但历史那几天的明细仍可能偏少。
   int _todayFor(String email, {required int fallback}) {
-    for (final d in _dailyFor(email)) {
-      if (d is Map && pickStr(d, ['day']) == _today) return pickInt(d.cast<String, dynamic>(), ['total'], fallback);
+    final hist = ((_data?['histories'] as Map?)?[email] as List?) ?? const [];
+    var sum = 0;
+    var hit = false;
+    for (final h in hist) {
+      if (h is! Map) continue;
+      final dt = DateTime.tryParse(pickStr(h, ['ts']))?.toLocal();
+      if (dt == null || dayKey(dt) != _today) continue;
+      sum += pickInt(h, ['gained']);
+      hit = true;
     }
-    return fallback;
+    return hit ? sum : fallback;
   }
 
   /// 面板 checkinSummary()[email]：{today, tasks:{source:{streak,todayDone}}, checkins:{kind:{days,daysMax,status,ts}}}
@@ -270,6 +279,7 @@ class _AccountsPageState extends State<AccountsPage> {
                       history: hist,
                       daily: _dailyFor(email),
                       today: _today,
+                      todayTotal: today,
                       checkins: checkins,
                       running: current,
                     ),
@@ -451,6 +461,7 @@ class _AccountsPageState extends State<AccountsPage> {
                                 history: (histories[email] as List?) ?? const [],
                                 daily: _dailyFor(email),
                                 today: _today,
+                                todayTotal: today,
                                 checkins: checkins,
                                 running: current,
                               ),
