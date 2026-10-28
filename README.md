@@ -1,7 +1,6 @@
 # rewards_app
 
-Microsoft Rewards 面板（[rewards-dashboard](https://github.com/bplhkx/rewards-dashboard)）的原生 Android 客户端，Flutter 写的。
-视觉沿用呆呆面板 APP 的设计语言：主色 `#409EFF`、slate 灰阶、圆角 8/12/14/pill、五个底部页签。
+Microsoft Rewards 面板（[rewards-dashboard](https://github.com/bplhkx/rewards-dashboard)）的原生 Android 客户端
 
 ## 界面一览
 
