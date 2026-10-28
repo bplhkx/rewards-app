@@ -37,6 +37,33 @@ class T {
   static const Color red100 = Color(0xFFFEE2E2);
   static const Color purple500 = Color(0xFF8B5CF6);
   static const Color purple100 = Color(0xFFEDE9FE);
+  static const Color cyan500 = Color(0xFF06B6D4);
+  static const Color cyan100 = Color(0xFFCFFAFE);
+
+  // ---------- 活动固定色 ----------
+  //
+  // 同一个活动在账号卡的胶囊、详情页的「打卡情况」和「升级活动打卡进度」里
+  // 必须是同一个色，所以下面这些界面一律从这里取，不要就地写 T.purple500。
+  // 之前打架的地方：绿色既是"今日已拿到分"（状态）又是"每日活动"（活动），
+  // 紫色既是"必应 App"（活动）又是账号卡上的"默认搜索"胶囊。
+  //
+  // 活动：          色：
+  //  印章收集        主色（跟个性化页的主题色走）
+  //  必应搜索        主色
+  //  每日打卡        主色
+  //  今日搜索额度    主色
+  //  必应 App        紫   —— 打卡情况和升级活动两处同一个紫
+  //  默认搜索引擎    青   —— 账号卡胶囊和升级活动行同一个青
+  //  每日活动        绿
+  //
+  // 绿/红/灰只当状态色用（拿到分 / 失败 / 未记录），不当活动色。
+  static Color get actPunch => primary;
+  static Color get actSearch => primary;
+  static Color get actDailySet => primary;
+  static Color get actSearchQuota => primary;
+  static Color get actBingApp => purple500;
+  static Color get actDefaultSearch => cyan500;
+  static Color get actDailyActivity => green500;
 
   /// 圆角四档，没有第五个
   static const double rSm = 8;
