@@ -218,7 +218,7 @@ class _ConfigPageState extends State<ConfigPage> {
                           style: TextStyle(fontSize: 13, fontWeight: changed ? FontWeight.w700 : FontWeight.w400, color: changed ? T.primary : null),
                         ),
                         value: on,
-                        activeColor: T.primary,
+                        activeThumbColor: T.primary,
                         onChanged: (v) => _set(p, v),
                       );
                     }),
@@ -236,6 +236,8 @@ class _ConfigPageState extends State<ConfigPage> {
                   style: TextStyle(fontSize: 11, color: T.subText(context))),
             ]),
           ),
+          const SizedBox(height: T.gap),
+          _humanizeCard(c),
           const SizedBox(height: T.gap),
           PanelCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -265,6 +267,248 @@ class _ConfigPageState extends State<ConfigPage> {
           ),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  static const _quietDayLabels = <String, String>{
+    'monday': '一',
+    'tuesday': '二',
+    'wednesday': '三',
+    'thursday': '四',
+    'friday': '五',
+    'saturday': '六',
+    'sunday': '日',
+  };
+
+  static final _hhmm = RegExp(r'^([01]?\d|2[0-3]):[0-5]\d$');
+
+  /// 拟人化（V4-china 特有）：每轮只完成剩余额度的一部分，剩下的留给下一轮，
+  /// 于是"当天这一份"被拆成几次做完。`humanize.enabled=false` 时下面全部不生效，
+  /// 所以整卡要能一眼看出开关状态；quietHours 是数组，PATCH 时整组替换。
+  Widget _humanizeCard(Map c) {
+    final on = getDeep(c, 'humanize.enabled') == true;
+    final rules = <Map<String, dynamic>>[
+      for (final r in (getDeep(c, 'humanize.quietHours') as List?) ?? const [])
+        if (r is Map) Map<String, dynamic>.from(r.cast<String, dynamic>()),
+    ];
+
+    void writeQuiet(List<Map<String, dynamic>> next) => _set('humanize.quietHours', next);
+
+    return PanelCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SectionTitle('拟人化 · 拆成几轮做'),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: const Text('总开关', style: TextStyle(fontSize: 13)),
+          subtitle: Text('关掉时下面全部不生效，行为和原版一致',
+              style: TextStyle(fontSize: 11, color: T.subText(context))),
+          value: on,
+          activeThumbColor: T.primary,
+          onChanged: (v) => _set('humanize.enabled', v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: const Text('当天跑成过就跳过', style: TextStyle(fontSize: 13)),
+          subtitle: Text('配合一天多次定时：后面几次自动变成兜底轮',
+              style: TextStyle(fontSize: 11, color: T.subText(context))),
+          value: getDeep(c, 'humanize.skipWhenCompletedToday') == true,
+          activeThumbColor: T.primary,
+          onChanged: (v) => _set('humanize.skipWhenCompletedToday', v),
+        ),
+        if (!on)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text('总开关关着，下面这些暂时都不生效',
+                style: TextStyle(fontSize: 11, color: T.amber500)),
+          ),
+        _numPairRow('humanize.searchTargetRatio', '搜索完成度', c,
+            decimal: true, hint: '每轮随机做到剩余额度的这个比例；1.0 就是一轮做满'),
+        _numPairRow('humanize.readToEarnArticles', '每轮阅读篇数', c,
+            hint: '一轮只随机读这么多篇，剩下的下一轮再读'),
+        const SizedBox(height: 8),
+        Text('静默时段', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text('跑进这个时间段会挂起到结束；支持跨午夜',
+            style: TextStyle(fontSize: 11, color: T.subText(context))),
+        const SizedBox(height: 4),
+        for (var i = 0; i < rules.length; i++)
+          _quietRow(rules[i], i, (Map<String, dynamic> updated) {
+            final next = [for (final r in rules) Map<String, dynamic>.from(r), ];
+            next[i] = updated;
+            writeQuiet(next);
+          }, () {
+            writeQuiet([for (var k = 0; k < rules.length; k++) if (k != i) Map<String, dynamic>.from(rules[k])]);
+          }),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => writeQuiet([
+              ...rules,
+              <String, dynamic>{
+                'days': _quietDayLabels.keys.toList(),
+                'start': '12:00',
+                'end': '14:30',
+              }
+            ]),
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('添加时段', style: TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+                foregroundColor: T.primary, padding: const EdgeInsets.symmetric(horizontal: 6)),
+          ),
+        ),
+        if (rules.isEmpty)
+          Text('没有静默时段，全天都可以跑',
+              style: TextStyle(fontSize: 11, color: T.subText(context))),
+      ]),
+    );
+  }
+
+  Widget _quietRow(
+    Map<String, dynamic> rule,
+    int index,
+    void Function(Map<String, dynamic>) update,
+    void Function() remove,
+  ) {
+    final days = <String>[
+      for (final d in (rule['days'] as List?) ?? const [])
+        if (d is String) d,
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 4, runSpacing: 4, children: [
+          for (final entry in _quietDayLabels.entries)
+            GestureDetector(
+              onTap: () {
+                final next = days.contains(entry.key)
+                    ? days.where((d) => d != entry.key).toList()
+                    : [...days, entry.key];
+                // 存回周一到周日的固定顺序，界面和文件都好读
+                update({
+                  ...rule,
+                  'days': _quietDayLabels.keys.where(next.contains).toList(),
+                });
+              },
+              child: Container(
+                width: 28,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: days.contains(entry.key) ? T.primary : T.surface(context),
+                  borderRadius: T.pill,
+                  border: Border.all(color: T.hairline(context)),
+                ),
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: days.contains(entry.key) ? Colors.white : T.subText(context),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 4),
+        Row(children: [
+          Expanded(child: _timeField('起始', rule['start'], (v) => update({...rule, 'start': v}))),
+          const SizedBox(width: 6),
+          Expanded(child: _timeField('结束', rule['end'], (v) => update({...rule, 'end': v}))),
+          IconButton(
+            onPressed: remove,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.delete_outline, size: 18),
+            color: T.red500,
+            tooltip: '删除这个时段',
+          ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _timeField(String hint, dynamic cur, void Function(String) onOk) {
+    final initial = (cur ?? '').toString();
+    return TextField(
+      key: ValueKey('$hint-$initial'),
+      controller: TextEditingController(text: initial),
+      keyboardType: TextInputType.datetime,
+      onSubmitted: (v) {
+        final t = v.trim();
+        if (_hhmm.hasMatch(t)) {
+          onOk(t);
+        } else {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('时间要写成 HH:MM，比如 12:30')));
+        }
+      },
+      style: const TextStyle(fontSize: 12),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        filled: true,
+        fillColor: T.surface(context),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(borderRadius: T.sm, borderSide: BorderSide(color: T.hairline(context))),
+      ),
+    );
+  }
+
+  Widget _numPairRow(String path, String label, Map c, {bool decimal = false, String? hint}) {
+    final m = getDeep(c, path);
+    final map = m is Map ? m : const <String, dynamic>{};
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          SizedBox(width: 108, child: Text(label, style: const TextStyle(fontSize: 12))),
+          Expanded(child: _miniNumField('$path.min', map['min'], 'min', decimal: decimal)),
+          const SizedBox(width: 6),
+          Expanded(child: _miniNumField('$path.max', map['max'], 'max', decimal: decimal)),
+        ]),
+        if (hint != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 108, top: 2),
+            child: Text(hint, style: TextStyle(fontSize: 11, color: T.subText(context))),
+          ),
+      ]),
+    );
+  }
+
+  Widget _miniNumField(String path, dynamic cur, String hint, {bool decimal = false}) {
+    final initial = (cur ?? '').toString();
+    num? parse(String raw) {
+      final t = raw.trim();
+      if (t.isEmpty) return null;
+      return decimal ? double.tryParse(t) : int.tryParse(t);
+    }
+
+    return TextField(
+      key: ValueKey('$path-${_dirty.containsKey(path) ? "d" : "o"}'),
+      controller: TextEditingController(text: initial),
+      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+      onSubmitted: (v) {
+        final n = parse(v);
+        if (n == null) return;
+        _set(path, n);
+      },
+      onChanged: (v) {
+        final n = parse(v);
+        if (n == null || n.toString() == initial) {
+          _dirty.remove(path);
+        } else {
+          _dirty[path] = n;
+        }
+        setState(() {});
+      },
+      style: const TextStyle(fontSize: 12),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        filled: true,
+        fillColor: T.surface(context),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(borderRadius: T.sm, borderSide: BorderSide(color: T.hairline(context))),
       ),
     );
   }
