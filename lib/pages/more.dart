@@ -229,7 +229,7 @@ class _MorePageState extends State<MorePage> {
             contentPadding: EdgeInsets.zero,
             title: const Text('深色模式', style: TextStyle(fontSize: 14)),
             value: Settings.dark,
-            activeColor: T.primary,
+            activeThumbColor: T.primary,
             // 只 setState 的话开关会变蓝、页面还是亮的：MaterialApp 在本页之上，
             // themeMode 要等根节点重建才会重读 Settings.dark。
             onChanged: (v) {

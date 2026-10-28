@@ -198,7 +198,7 @@ class _SchedulePageState extends State<SchedulePage> {
               ),
               Switch(
                 value: enabled,
-                activeColor: T.primary,
+                activeThumbColor: T.primary,
                 onChanged: (v) => setState(() => (_cur ?? _local!)['enabled'] = v),
               ),
             ]),
@@ -264,7 +264,7 @@ class _SchedulePageState extends State<SchedulePage> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('正在跑就跳过这次', style: TextStyle(fontSize: 13)),
                 value: cur['skipIfRunning'] != false,
-                activeColor: T.primary,
+                activeThumbColor: T.primary,
                 onChanged: (v) => setState(() => (_cur ?? _local!)['skipIfRunning'] = v),
               ),
             ]),
@@ -284,6 +284,8 @@ class _SchedulePageState extends State<SchedulePage> {
                   dense: true,
                   controlAffinity: ListTileControlAffinity.leading,
                   value: _excluded.contains(pickInt(a, ['index'])),
+                  // CheckboxListTile 没有 activeThumbColor（那是 Switch 那一族的改名），
+                  // 这里保持 activeColor，它在这个控件上并未被弃用
                   activeColor: T.red500,
                   title: Text(pickStr(a, ['email']), style: const TextStyle(fontSize: 13)),
                   subtitle: Text('序号 ${pickInt(a, ['index'])}', style: TextStyle(fontSize: 11, color: T.subText(context))),
@@ -336,7 +338,7 @@ class _SchedulePageState extends State<SchedulePage> {
     return [
       '面板调度器',
       if (last.isNotEmpty) '上次触发 ${whenText(last)}${res.isEmpty ? '' : '（$res）'}' else '还没触发过',
-      if (_saved != null) _saved!,
+      ?_saved,
     ].join(' · ');
   }
 

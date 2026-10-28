@@ -202,7 +202,7 @@ class _LogsPageState extends State<LogsPage> {
                             shape: RoundedRectangleBorder(borderRadius: T.pill),
                           ),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
-                          label: Text('最新 ${_behind} 条', style: const TextStyle(fontSize: 12)),
+                          label: Text('最新 $_behind 条', style: const TextStyle(fontSize: 12)),
                         ),
                       ),
                   ]),

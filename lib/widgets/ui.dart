@@ -129,7 +129,7 @@ class SectionTitle extends StatelessWidget {
       children: [
         Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
         const Spacer(),
-        if (trailing != null) trailing!,
+        ?trailing,
       ],
     );
   }
