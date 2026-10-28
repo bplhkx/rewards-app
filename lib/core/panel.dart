@@ -27,6 +27,8 @@ class Panel {
 
   Future<dynamic> patch(String path, [Object? body]) => _send('PATCH', path, body: body);
 
+  Future<dynamic> delete(String path, [Map<String, String>? q]) => _send('DELETE', path, query: q);
+
   Future<dynamic> _send(String method, String path, {Map<String, String>? query, Object? body}) async {
     final req = await HttpClient()
         .openUrl(method, Uri.parse(base + path).replace(queryParameters: query))

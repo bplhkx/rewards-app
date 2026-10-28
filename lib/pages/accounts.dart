@@ -160,7 +160,7 @@ class _AccountsPageState extends State<AccountsPage> {
       Pill('今日 +$today', color: today > 0 ? T.green500 : T.slate500),
       Pill('连胜 $streak 天', color: T.amber500),
       if (!compact && pickBool(m, ['streakProtectionEnabled'])) Pill('连胜保护-$shieldDays天', color: T.primary),
-      if (!compact && dse != null) Pill(dse, color: T.purple500),
+      if (!compact && dse != null) Pill(dse, color: T.actDefaultSearch),
     ];
   }
 
@@ -204,6 +204,67 @@ class _AccountsPageState extends State<AccountsPage> {
   void _toast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// 重置登录状态：让面板调 bot 的 DELETE /sessions/{email}?platform=...，
+  /// 把存下来的 cookie 清掉。下一轮跑到这个账号时取不到会话，就会用 .env 里的
+  /// 账号密码重新登录并回写新会话 —— 这一步本身不打卡、不搜索、不领取，
+  /// 所以不会消耗任何当日额度。
+  Future<void> _resetLogin(String email) async {
+    final platform = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('清掉保存的登录会话，下一轮会用账号密码重新登录。移动端和桌面端是两条独立的登录，只动坏的那条。',
+                  style: TextStyle(fontSize: 12, height: 1.5)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.phone_android_outlined, size: 20),
+              title: const Text('只重置移动端'),
+              onTap: () => Navigator.pop(c, 'mobile'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.desktop_windows_outlined, size: 20),
+              title: const Text('只重置桌面端'),
+              onTap: () => Navigator.pop(c, 'desktop'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.sync_outlined, size: 20),
+              title: const Text('两端都重置'),
+              onTap: () => Navigator.pop(c, 'both'),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+    if (platform == null || !mounted) return;
+
+    final names = {'mobile': '移动端', 'desktop': '桌面端', 'both': '两端'};
+    setState(() => _busy = true);
+    try {
+      final r = await widget.panel
+          .delete('/api/sessions/${Uri.encodeComponent(email)}', {'platform': platform});
+      final removed = r is Map ? (r['platforms'] as List?)?.join('、') : null;
+      final left = r is Map ? (r['remaining'] as List?)?.join('、') : null;
+      _toast('已重置${names[platform] ?? ''}登录状态'
+          '${removed == null || removed.isEmpty ? '' : '（清掉 $removed）'}'
+          '${left == null || left.isEmpty ? '' : ' · 仍保留 $left'}'
+          ' · 下一轮重新登录');
+    } catch (e) {
+      _toast('重置失败：${errText(e)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// 把 histories 汇成 {YYYY-MM-DD: 当天总分}，热力图要用
@@ -376,7 +437,7 @@ class _AccountsPageState extends State<AccountsPage> {
                 child: Row(children: [
                   Container(width: 6, height: 6, decoration: BoxDecoration(color: T.green500, borderRadius: T.pill)),
                   const SizedBox(width: 5),
-                  Text('当前在跑 ${_currentEmail}',
+                  Text('当前在跑 $_currentEmail',
                       style: const TextStyle(fontSize: 11.5, color: T.green500, fontWeight: FontWeight.w700)),
                 ]),
               ),
@@ -511,10 +572,12 @@ class _AccountsPageState extends State<AccountsPage> {
                             icon: const Icon(Icons.more_horiz, size: 20),
                             onSelected: (v) {
                               if (v == 'only') _run(only: idx);
+                              if (v == 'reset') _resetLogin(email);
                               if (v == 'pick') setState(() { _selecting = true; _picked.add(idx); });
                             },
                             itemBuilder: (_) => const [
                               PopupMenuItem(value: 'only', child: Text('只跑这个账号')),
+                              PopupMenuItem(value: 'reset', child: Text('重置登录状态')),
                               PopupMenuItem(value: 'pick', child: Text('加入批量选择')),
                             ],
                           ),
