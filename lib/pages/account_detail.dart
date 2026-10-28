@@ -292,24 +292,41 @@ class AccountDetailPage extends StatelessWidget {
   /// 按关键字找 kind。streak 的 kind 名带的是页面上的 partner（slug 化之后仍不可控，
   /// 可能是 "bing"、"search"、"cn.bing"…），所以只能按关键字认，不能写死全名。
   ///
-  /// 两个坑：
+  /// 三条规则，都是实测踩出来的：
   /// · `cycles-*` 是"已经集满几轮"的计数（存成 n/n），必须排除 —— 否则
   ///   `cycles-dailyset` 会被关键字 "dailyset" 捞走，界面上就变成"1 格里亮 1 格"，
   ///   把真正的 dailyset=4/7 顶掉（10-15 实测就是这个）。
-  /// · 先按全名精确匹配，再退到包含匹配，别依赖 map 的遍历顺序。
+  /// · **关键字的顺序就是优先级**：先按全名精确匹配（按调用方给的顺序），全都没有
+  ///   才退到包含匹配。之前是"遍历 map，谁先出现谁赢"，而 map 的顺序是面板写库的
+  ///   顺序，同一行在两个 kind 之间会漂 —— 10-28 的"必应 App 显示 0 格"就是这个，
+  ///   真源 `streak-bingapp` 1/7 被 `dailystreaks_mobile` 0/7 顶掉。
   Map<String, dynamic> _kindLike(List<String> keywords) {
     final all = (checkins['checkins'] as Map?) ?? const {};
-    Map<String, dynamic>? hit;
+    final rows = <String, Map<String, dynamic>>{};
     for (final entry in all.entries) {
       final key = entry.key.toLowerCase();
       if (key.startsWith('cycles-')) continue;
       final v = entry.value;
-      if (v is! Map) continue;
-      if (keywords.contains(key)) return v.cast<String, dynamic>();
-      if (hit == null && keywords.any(key.contains)) hit = v.cast<String, dynamic>();
+      if (v is Map) rows[key] = v.cast<String, dynamic>();
     }
-    return hit ?? const <String, dynamic>{};
+    final wanted = keywords.map((k) => k.toLowerCase()).toList();
+    for (final k in wanted) {
+      final hit = rows[k];
+      if (hit != null) return hit;
+    }
+    for (final k in wanted) {
+      for (final row in rows.entries) {
+        if (row.key.contains(k)) return row.value;
+      }
+    }
+    return const <String, dynamic>{};
   }
+
+  /// 上一次记录不是今天读到的 → 格子画淡一档。数字仍是最后一次的真值，
+  /// 但不能让人读成"今天已经到这儿了"。
+  Color? _stale(Color? base, Map<String, dynamic> k) => k['today'] != false
+      ? base
+      : (base ?? T.primary).withValues(alpha: 0.4);
 
   /// 有真进度就用真进度，没有就退回 daily_points 的"连续得分天数"近似值。
   /// 两种情况都画成**累计格**：连续 n 天就点亮前 n 格（不是"哪几天有分"的日历点），
@@ -329,7 +346,7 @@ class AccountDetailPage extends StatelessWidget {
         // 右侧不再写 "3/7"：方格本身就是 7 格里亮 3 格，数字重复且碍事（用户明确要求）
         dots: _cells(days, max),
         dotCell: max > 16 ? 11 : 15,
-        color: color,
+        color: _stale(color, real),
       );
     }
     return ProgressRow(
@@ -339,33 +356,6 @@ class AccountDetailPage extends StatelessWidget {
       dotCell: fallbackStreak > 7 ? 11 : 15,
       color: color,
     );
-  }
-
-  /// 最近 n 天里"当天拿到过任何积分"的天（下标 0 = 今天）
-  List<bool> _anyDays({int n = 7}) {
-    final has = <String>{
-      for (final d in daily.whereType<Map>())
-        if (pickInt(d.cast<String, dynamic>(), ['total']) > 0) '${d['day']}',
-    };
-    return _dayFlags(n, has);
-  }
-
-  List<bool> _dayFlags(int n, Set<String> has) {
-    // today 是面板给的北京日期；DateTime 不可变，这里必须是普通赋值而不是级联
-    final base = DateTime.tryParse(today) ?? DateTime.now();
-    return List.generate(n, (i) => has.contains(dayKey(base.subtract(Duration(days: i)))));
-  }
-
-  int _overallStreak() {
-    // 和面板同一套口径：今天还没跑不算断，从昨天往前数
-    final has = _anyDays(n: 90);
-    var n = 0;
-    var i = has[0] ? 0 : 1;
-    while (i < has.length && has[i]) {
-      n++;
-      i++;
-    }
-    return n;
   }
 
   /// x/y 的进度画成 y 个格子（前 x 个填色）。手机上条状进度没有刻度，
@@ -395,6 +385,7 @@ class AccountDetailPage extends StatelessWidget {
             label: '印章收集',
             dots: _cells(pickInt(punch, ['days']), pickInt(punch, ['daysMax'])),
             dotCell: 16,
+            color: _stale(T.actPunch, punch),
           )
         else
           // 只拿到"几张卡"的时候不画格子：两个空格子会被读成"总共只有两枚印章"
@@ -403,18 +394,23 @@ class AccountDetailPage extends StatelessWidget {
             value: cards.isEmpty ? null : '${pickInt(cards, ['days'])} 张卡',
           ),
         _streakRow('必应搜索', const ['streak-bing', 'streak-search', 'dailystreaks_bing'],
-            fallbackStreak: streakOf('search')),
-        ProgressRow(
-          label: '每日打卡',
-          // 必须是 ${_overallStreak()} —— 写 $_overallStreak() 只会插值函数本身，
-          // 屏幕上就冒出 "Closure: () => int from Function '_overallStreak'"
-          value: '连续 ${_overallStreak()} 天',
-          dots: _cells(_overallStreak(), _overallStreak() > 7 ? _overallStreak() : 7),
-          dotCell: _overallStreak() > 7 ? 11 : 15,
-          color: T.amber500,
-        ),
-        _streakRow('必应 App', const ['streak-mobile', 'streak-app', 'dailystreaks_mobile'],
-            fallbackStreak: streakOf('checkIn'), color: T.purple500),
+            fallbackStreak: streakOf('search'), color: T.actSearch),
+        // 页面上"每日打卡"那张 7 天卡的真进度是 streak-dailyset；
+        // tasks-dailyset 是"今天 3 个任务做了几件"，只在 streak 没记到时兜底。
+        _streakRow('每日打卡',
+            const ['streak-dailyset', 'streak-daily', 'tasks-dailyset', 'tasks-daily', 'dailyset'],
+            fallbackStreak: streakOf('urlReward'), color: T.actDailySet),
+        // 这里原来还有一行"连续得分"（拿 daily_points 数连续有分的天数）：
+        // 它既不是页面上的任何一张打卡卡，又和账号卡的「连胜 N 天」、下面的
+        // 「连胜保护 · 连胜 N 天」是两个口径的同一个意思，10-28 用户直接指出
+        // 它意义不明。删掉，不再另起名字。
+        // 必应 App 的 streak 卡 kind 是 streak-bingapp（partner 名是 bingapp），
+        // 原来只列了 streak-mobile / streak-app 两个不存在的名字，于是退到
+        // dailystreaks_mobile（升级活动自己的计数，今天还没做=0），界面上就成了
+        // "明明签到成功了却一格不亮"。dailystreaks_mobile 留在最后兜底。
+        _streakRow('必应 App',
+            const ['streak-bingapp', 'streak-mobile', 'streak-app', 'dailystreaks_mobile'],
+            fallbackStreak: streakOf('checkIn'), color: T.actBingApp),
         if (search.isNotEmpty)
           // 机器人那行 "Desktop: 60/60" 是 pointProgress/pointProgressMax，
           // 也就是积分额度，不是搜索次数（SearchProgress.summarize 里加的就是分数）
@@ -422,6 +418,8 @@ class AccountDetailPage extends StatelessWidget {
             label: '今日搜索额度',
             value: '${pickInt(search, ['days'])} 分',
             note: '上限 ${pickInt(search, ['daysMax'])} 分',
+            // 这行没有格子，所以"不是今天读到的"只能靠数字本身变淡
+            color: _stale(T.actSearchQuota, search),
           ),
       ]),
     );
@@ -454,7 +452,7 @@ class AccountDetailPage extends StatelessWidget {
           // 一格一天/一项；没有周期计数时右侧就空着
           dots: _cells(days, max),
           dotCell: max > 16 ? 11 : 15,
-          color: color,
+          color: _stale(color, d),
         );
       }
       final streak = streakOf(source);
@@ -478,12 +476,12 @@ class AccountDetailPage extends StatelessWidget {
           Text('奖励在下一个日历月初发放', style: TextStyle(fontSize: 10, color: T.subText(context))),
         ]),
         const SizedBox(height: 2),
-        row('默认搜索引擎', const ['default-search'], '天', '', T.primary, ''),
-        row('每日活动', const ['dailyset', 'tasks-daily', 'streak-daily'], '项', 'daily-set-today', T.green500,
-            'urlReward',
+        row('默认搜索引擎', const ['default-search'], '天', '', T.actDefaultSearch, ''),
+        row('每日活动', const ['dailyset', 'tasks-daily', 'streak-daily'], '项', 'daily-set-today',
+            T.actDailyActivity, 'urlReward',
             cyclesKind: 'cycles-dailyset'),
         row('必应 App 签到', const ['dailystreaks_mobile', 'tasks-mobile', 'streak-mobile', 'streak-app'], '项',
-            'app-checkin-today', T.purple500, 'checkIn',
+            'app-checkin-today', T.actBingApp, 'checkIn',
             cyclesKind: 'cycles-dailystreaks_mobile'),
       ]),
     );
