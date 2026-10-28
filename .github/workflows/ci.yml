@@ -1,0 +1,63 @@
+name: CI
+
+# The analyzer is clean (0 issues), so `flutter analyze` is a hard gate rather
+# than a warning list. The build step is the one that actually matters here:
+# the glass dock uses an Impeller fragment shader and a custom pubspec
+# `shaders:` entry, both of which only fail at build time.
+on:
+    push:
+        branches: ['main', 'master']
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    analyze-test-build:
+        name: Analyze, test and build the APK
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set up Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                  flutter-version: '3.47.7'
+                  channel: stable
+                  cache: true
+
+            - name: Install packages
+              run: flutter pub get
+
+            - name: Analyze (must be clean)
+              run: flutter analyze --no-pub
+
+            - name: Unit tests
+              run: flutter test
+
+            - name: Build release APK
+              # android/key.properties and the keystore are not in the repo, so
+              # Gradle falls back to debug signing - fine for a CI artifact.
+              run: flutter build apk --release
+
+            - name: Assert the shader shipped in the APK
+              run: |
+                  set -euo pipefail
+                  unzip -l build/app/outputs/flutter-apk/app-release.apk \
+                    | grep -q 'assets/flutter_assets/shaders/lens.frag'
+                  echo "lens.frag is inside the APK"
+
+            - name: Upload APK
+              uses: actions/upload-artifact@v4
+              with:
+                  name: rewards-app-release
+                  path: build/app/outputs/flutter-apk/app-release.apk
+                  if-no-files-found: error
