@@ -62,6 +62,15 @@ void main() {
       expect(minutes(90), '1.5');
       expect(minutes(0), '0.0');
     });
+
+    test('groupNum 千分位，和必应页面上的 2,100 对得上', () {
+      expect(groupNum(2100), '2,100');
+      expect(groupNum(60), '60');
+      expect(groupNum(1000), '1,000');
+      expect(groupNum(1234567), '1,234,567');
+      expect(groupNum(0), '0');
+      expect(groupNum(-2100), '-2,100');
+    });
   });
 
   group('状态与分类', () {

@@ -483,7 +483,28 @@ class AccountDetailPage extends StatelessWidget {
         row('必应 App 签到', const ['dailystreaks_mobile', 'tasks-mobile', 'streak-mobile', 'streak-app'], '项',
             'app-checkin-today', T.actBingApp, 'checkIn',
             cyclesKind: 'cycles-dailystreaks_mobile'),
+        _starRow(),
       ]),
+    );
+  }
+
+  /// 必应 Star 奖励的「奖励追踪」：本月累计到的合格搜索分，分母是页面当时的每月目标
+  /// （必应每周会改这个标准，所以分母跟着每轮日志走，不写死 2100）。
+  /// 这是整月的累计值，不是"第几天"，2100 也画不成格子，所以只写数字。
+  /// bot 那一行（STAR-BONUS）随 /dashboard 的印章读取一起产生，还没记到时明说未记录。
+  Widget _starRow() {
+    final star = _kind('star-tracker');
+    if (star.isEmpty) {
+      return ProgressRow(label: '必应 Star 奖励', value: '未记录', color: T.actStarBonus);
+    }
+    final cur = pickInt(star, ['days']);
+    final max = pickInt(star, ['daysMax'], 1);
+    return ProgressRow(
+      label: '必应 Star 奖励',
+      value: '${groupNum(cur)} / ${groupNum(max)}',
+      note: pickStr(star, ['status']) == 'complete' ? '本月已达目标' : '本月累计',
+      // 没有格子可画淡，所以和"今日搜索额度"一样靠数字本身变淡
+      color: _stale(T.actStarBonus, star),
     );
   }
 

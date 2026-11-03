@@ -63,6 +63,10 @@ class T {
   static Color get actSearchQuota => primary;
   static Color get actBingApp => purple500;
   static Color get actDefaultSearch => cyan500;
+
+  /// 必应 Star 奖励（弹层标题就叫"奖励追踪"）是月度累计，页面上那张卡的图标是金色，
+  /// 和每日活动/搜索那些固定色分开，避免被读成"又一个今天的打卡"。
+  static Color get actStarBonus => amber500;
   static Color get actDailyActivity => green500;
 
   /// 圆角四档，没有第五个

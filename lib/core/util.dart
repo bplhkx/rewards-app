@@ -62,6 +62,17 @@ String maskEmail(String email) {
 
 String minutes(num sec) => (sec / 60).toStringAsFixed(1);
 
+/// 页面上的月度目标都是四位数（2,100 这种），带千分位才和必应那一栏对得上。
+String groupNum(int n) {
+  final s = n.abs().toString();
+  final out = StringBuffer(n < 0 ? '-' : '');
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) out.write(',');
+    out.write(s[i]);
+  }
+  return out.toString();
+}
+
 /// 把 ISO 时间说成"今天 09:00 / 明天 07:30 / 10/12 09:00"，定时相关的展示都用它。
 String whenText(String iso) {
   final dt = DateTime.tryParse(iso)?.toLocal();
